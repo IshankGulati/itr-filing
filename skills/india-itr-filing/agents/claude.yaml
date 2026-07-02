@@ -1,0 +1,4 @@
+interface:
+  display_name: "India ITR Filing"
+  short_description: "Profile case, gather docs, build filing pack"
+  default_prompt: "Use the india-itr-filing skill to profile this tax case, gather only the needed documents, build a filing workpaper pack, and create a draft ITR JSON only when the current AY utility, schema, and validation workflow are actually available and actually used."
