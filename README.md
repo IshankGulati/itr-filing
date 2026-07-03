@@ -14,6 +14,30 @@ The default deliverable is a workpaper pack, not an upload-ready JSON. A draft `
 
 This repository is not tax advice. Treat it as an agent workflow and workpaper scaffold, then verify all filing positions, thresholds, utility behavior, and portal navigation against current official Income Tax Department sources for the active `AY`.
 
+## Current Capabilities
+
+- Profiles an Indian tax case first, then infers the likely `ITR` form, return mode, regime posture, and schedule candidates before asking for documents.
+- Supports adaptive intake for `ITR-1` through `ITR-4`, and triage-first workpaper preparation for `ITR-5` through `ITR-7`.
+- Builds a filing workpaper pack around `profile.yaml`, `document_manifest.csv`, `schedule_map.md`, `itr_working.md`, `itr_line_by_line.md`, `open_questions.md`, `case_learnings.md`, and `outputs/filing-readiness.md`.
+- Keeps document collection targeted instead of generic, including support for scattered local files through a manifest-driven workflow.
+- Covers reconciliation across salary, house property, business or profession, capital gains, other sources, deductions, taxes paid, and carry-forward dependencies.
+- Handles foreign-broker and foreign-asset cases by guiding lot reconstruction, FX-method documentation, and downstream `FA` / `FSI` / `TR` / `Form 67` workpapers when relevant.
+- Includes local tooling to bootstrap a case workspace and to detect drift between documented schedule ids and the skill's `schedule_candidates` enum.
+
+## What To Expect
+
+- The primary output is a filing workpaper pack, not an upload-ready return by default.
+- A draft `ITR` JSON is a secondary artifact and should only be expected when the current-`AY` utility, schema, and validation workflow are actually available and actually used.
+- The skill is intentionally conservative: it should ask only for documents that matter to the profiled case, and it may stop at explicit blockers or open questions when records are incomplete.
+- Foreign-income and capital-gains support is designed for Indian taxpayers with overseas holdings or income; it is not a non-Indian return-preparation engine.
+- This repository helps structure and document the work. Users should still expect final verification against current official portal instructions, form help, schema behavior, and law for the active `AY`.
+
+## Foreign Capital Gains And FX Helpers
+
+When foreign capital gains need INR conversion support, first reuse any reliable local `rule115`, `ttbr`, or `sbi_tt` workpapers already present in the workspace. If a fresh historical `SBI TT` lookup is needed, the repo [skbly7/sbi-tt-rates-historical](https://github.com/skbly7/sbi-tt-rates-historical) can be used as a helper source for historical TT rates while reconstructing foreign capital gains.
+
+Treat that repo as an operational aid, not as a substitute for documenting the chosen Rule-115 or other FX method, relevant date logic, and current-law basis for the case.
+
 ## Installing
 
 The skill lives at [skills/india-itr-filing](skills/india-itr-filing), self-contained under a folder named after the skill. Both Claude Code and Codex CLI discover skills by scanning a `skills/` directory for `SKILL.md` files, so install by copying (or symlinking) that folder into the right place. A skill folder is not effective one level too deep — the path must end in `.../india-itr-filing/SKILL.md`.
@@ -77,6 +101,7 @@ Either way, the skill drives an adaptive intake: it profiles the taxpayer, reque
 - [skills/india-itr-filing/SKILL.md](skills/india-itr-filing/SKILL.md) contains the main workflow.
 - [skills/india-itr-filing/references](skills/india-itr-filing/references) contains focused reference notes for intake, forms, schedules, document retrieval, broker exports, and foreign-income handling.
 - [skills/india-itr-filing/scripts/bootstrap_case.py](skills/india-itr-filing/scripts/bootstrap_case.py) bootstraps a local case workspace.
+- [skills/india-itr-filing/scripts/check_schedule_consistency.py](skills/india-itr-filing/scripts/check_schedule_consistency.py) checks that the skill's documented schedule ids stay aligned with [references/forms-and-schedules.md](skills/india-itr-filing/references/forms-and-schedules.md).
 - [skills/india-itr-filing/agents](skills/india-itr-filing/agents) contains additive harness metadata.
 
 ## Bootstrap Examples
@@ -100,6 +125,19 @@ python3 skills/india-itr-filing/scripts/bootstrap_case.py /tmp/itr-case \
   --filing-goal json_draft_if_feasible
 ```
 
-## Extending
+Check schedule-doc consistency after changing schedule ids or schedule reference docs:
 
-Provider-specific knowledge should be added additively through `references/` instead of overfitting the core skill to one broker or platform. See [skills/india-itr-filing/references/broker-playbooks.md](skills/india-itr-filing/references/broker-playbooks.md) for the extension pattern.
+```bash
+python3 skills/india-itr-filing/scripts/test_check_schedule_consistency.py
+```
+
+## Contributors
+
+Contributors should keep the core skill generic and extend it additively.
+
+- To add a broker or investment platform, extend [skills/india-itr-filing/references/broker-playbooks.md](skills/india-itr-filing/references/broker-playbooks.md) with a focused mini-playbook covering where reports live, which exports matter, preferred formats, known quirks, and the minimum artifact set needed for Indian-tax reconstruction.
+- To add another modular component, prefer a new focused file under [skills/india-itr-filing/references](skills/india-itr-filing/references) when the addition is guidance, or a reusable script under [skills/india-itr-filing/scripts](skills/india-itr-filing/scripts) when the addition is operational tooling that can help across cases.
+- Keep the workflow logic in [skills/india-itr-filing/SKILL.md](skills/india-itr-filing/SKILL.md) harness-neutral. Put harness-specific behavior only in [skills/india-itr-filing/agents](skills/india-itr-filing/agents).
+- Update tests and docs together when you change scaffold outputs, schedule enums, or reference structure. At minimum, run `python3 skills/india-itr-filing/scripts/test_bootstrap_case.py` and `python3 skills/india-itr-filing/scripts/test_check_schedule_consistency.py`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the compact maintainer checklist.

@@ -44,10 +44,19 @@ class BootstrapCaseTests(unittest.TestCase):
 
             self.assertIn("## Core schedule candidates", schedule_map)
             self.assertNotIn("### Foreign schedules", schedule_map)
+            self.assertTrue((case_root / "inputs" / "salary").exists())
+            self.assertTrue((case_root / "inputs" / "investments").exists())
+            self.assertFalse((case_root / "inputs" / "capital_gains").exists())
+            self.assertFalse((case_root / "inputs" / "deductions").exists())
+            # A lean case does not spawn empty foreign/business/prior-year folders.
+            self.assertFalse((case_root / "inputs" / "foreign").exists())
+            self.assertFalse((case_root / "inputs" / "business").exists())
+            self.assertFalse((case_root / "inputs" / "prior_year").exists())
             # A simple workpaper case stays lean (no JSON scaffold) but still tracks readiness.
             self.assertFalse((case_root / "outputs" / "itr-draft.json").exists())
             self.assertFalse((case_root / "outputs" / "validation-notes.md").exists())
             self.assertTrue((case_root / "outputs" / "filing-readiness.md").exists())
+            self.assertTrue((case_root / "case_learnings.md").exists())
 
     def test_json_targeted_case_gets_full_scaffold(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -66,6 +75,12 @@ class BootstrapCaseTests(unittest.TestCase):
             self.assertIn("### Deductions and reliefs (`VI-A`)", schedule_map)
             self.assertIn("- `SI`:", schedule_map)
             self.assertIn("- `AL`:", schedule_map)
+            self.assertTrue((case_root / "inputs" / "salary").exists())
+            self.assertTrue((case_root / "inputs" / "business").exists())
+            self.assertTrue((case_root / "inputs" / "investments").exists())
+            self.assertTrue((case_root / "inputs" / "foreign").exists())
+            self.assertTrue((case_root / "inputs" / "prior_year").exists())
+            self.assertTrue((case_root / "inputs" / "portal_anchors").exists())
             self.assertTrue((case_root / "outputs" / "itr-draft.json").exists())
             self.assertTrue((case_root / "outputs" / "validation-notes.md").exists())
             self.assertTrue((case_root / "outputs" / "filing-readiness.md").exists())

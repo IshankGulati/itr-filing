@@ -3,11 +3,12 @@
 ## Contents
 
 1. First questions
-2. Profile dimensions
-3. Simple versus complex case split
-4. Filing-need triage
-5. Manifest-first intake
-6. Minimum starter artifacts
+2. Follow-up question style
+3. Profile dimensions
+4. Simple versus complex case split
+5. Filing-need triage
+6. Manifest-first intake
+7. Minimum starter artifacts
 
 ## 1. First questions
 
@@ -20,7 +21,27 @@ Ask these before asking for documents.
 - Is the target output a filing workpaper pack, a schema-tested draft JSON if feasible, or only a tax estimate?
 - If the user is unsure whether filing is mandatory, do we need to verify current filing triggers from official sources first?
 
-## 2. Profile dimensions
+## 2. Follow-up question style
+
+Use these rules once the first-pass profile is on paper:
+
+- Open the case with a short "AI tax consultant" persona and a brief warning that mistakes are possible and final positions must be verified before filing.
+- Infer answers from the documents first when the evidence is already likely to be in `AIS`, `26AS`, broker statements, `Form 16A`, invoices, or books.
+- When a question is still needed, use plain English, say why it matters, and state the current threshold or decision rule only after checking current official sources for the active `FY` or `AY`.
+- If a threshold is not yet verified, say that you are checking it instead of pretending the section number itself is understandable.
+
+Sample rewrites:
+
+- Instead of `Is your freelance income run under 44ADA presumptive taxation, or regular books?`
+  ask `For your freelance or professional income, are you using the simpler presumptive route where we use a standard profit percentage, or are you keeping normal books and claiming actual expenses? This tells me whether we stay in the presumptive lane or need full business schedules.`
+- Instead of `Does your freelance turnover cross the 44AB audit threshold?`
+  ask `Are your business or professional receipts anywhere near the current tax-audit trigger for your year? I will verify the exact threshold from current official sources before relying on it, because the rule can change with the facts.`
+- Instead of `Did your foreign broker dividends have tax withheld abroad?`
+  ask `Your broker dividend statement usually shows this. If you share it, I will infer it from the document; if not, tell me whether tax was withheld abroad on those dividends because that affects foreign-tax-credit and Form 67 work.`
+- Instead of `Any house property or crypto/VDA holdings not mentioned yet?`
+  ask `Is there any rental or house-property activity, or any crypto or VDA trading, that is not already visible in the documents?`
+
+## 3. Profile dimensions
 
 Use these to keep the request adaptive.
 
@@ -90,7 +111,7 @@ Build an early schedule list and keep refining it.
 
 Keep `SI` separate from `SPI` while profiling. They are not interchangeable schedule labels.
 
-## 3. Simple versus complex case split
+## 4. Simple versus complex case split
 
 ### Usually simple
 
@@ -125,7 +146,7 @@ Ask for a minimal set only.
 - prior-year losses
 - audit or transfer pricing forms
 
-## 4. Filing-need triage
+## 5. Filing-need triage
 
 If the user is unsure whether filing is required, verify current official triggers before doing deep collection work.
 
@@ -138,7 +159,7 @@ Common reasons this check matters:
 
 If this check is unresolved, keep the case in `document_collection_first` or `tax_estimate_only` mode until the filing requirement is clearer.
 
-## 5. Manifest-first intake
+## 6. Manifest-first intake
 
 Do not require the user to move files into a specific folder tree.
 
@@ -153,7 +174,7 @@ Instead:
 
 Use copying into a local workspace only when it actually helps.
 
-## 6. Minimum starter artifacts
+## 7. Minimum starter artifacts
 
 Create these immediately:
 

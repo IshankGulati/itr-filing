@@ -64,14 +64,30 @@ Do not skip this workflow merely because the broker already shows total realized
   - `*rule115*`
   - `*sbi_tt*`
 - Reuse reliable local rate workpapers before building a new rate table.
+- If exact dated rates can be recovered from local workpapers or checked-in helper outputs, do that before asking the user whether placeholder precision is acceptable.
+- If a fresh historical `SBI TT` lookup is needed, the helper repo `skbly7/sbi-tt-rates-historical` can assist in fetching historical TT rates for foreign-capital-gains work; still document the exact source, dates, and method used in the case notes.
 - Do not assume `Rule 115` or `SBI TTBR` is the universal answer for every foreign-income type.
-- Keep the conversion method explicit.
-- Keep the source explicit.
-- Keep the relevant date logic explicit.
+- Named anti-pattern: `Rule 115` and `Rule 115A` are not the same provision. `Rule 115A` is the averaging mechanism for the first proviso to section 48, which applies to **non-residents** on shares or debentures of an Indian company. A **resident** selling **foreign** shares is normally outside that proviso, so the gain is computed under the main section-48 route and converted under `Rule 115`. Do not apply the non-resident `115A` mechanics to a resident's foreign-share gain.
+- Keep the conversion method explicit, the source explicit, and the relevant date logic explicit.
 - Write the method into the case notes before using the numbers in scenario comparisons.
+- Before presenting an FX-converted gain as final, compute a rough independent estimate such as foreign-currency gain times a representative sale-date rate. If the detailed INR answer diverges materially, re-check the rate dates and mechanics before sending it.
 - If the method is still provisional, mark the resulting INR values as provisional too.
 
 Do not bury the FX assumption inside a spreadsheet without explaining it in prose.
+
+### Resident foreign-share gains: two live conversion methods
+
+For a resident selling foreign shares there are **two methods seen in real practice**, and they produce materially different taxable gains once the rupee has moved. Do not silently pick one and call the other an error. This is a genuine interpretive fork, not a settled rule.
+
+- **Per-leg conversion (mainstream).** Convert cost at the `SBI TTBR` for the month-end **before the purchase** and proceeds at the `SBI TTBR` for the month-end **before the sale**; the taxable gain is the INR difference. This is the method practitioner sources such as Zerodha Varsity illustrate. It **deliberately captures rupee movement inside the taxable gain**, which is the normal treatment for a resident's foreign asset (residents do not get the non-resident `115A` FX protection). When the rupee has weakened, this yields the **larger** gain, and that is expected, not a bug.
+- **Single-rate-on-net-gain (minority reading).** Compute the gain in foreign currency first, then convert the net gain once at the month-end `TTBR` before sale. This treats the whole capital-gains head as converting at one specified date. It yields a **lower** gain when the rupee has depreciated.
+
+Rules for handling this fork:
+
+- Pick the method deliberately, name it, and cite the source you relied on. Do not switch methods just because a number "feels" too high or because a prior tool or the user reported a different figure.
+- When the two methods diverge materially, present **both** numbers and surface the choice to the user or their CA rather than quietly adopting the lower one. A large gap is usually the FX method, not a data error.
+- A rupee-depreciation component showing up in a resident's gain is normal under the mainstream method; do not "correct" it away without a stated legal basis.
+- Run the rough sanity bound in both cases, but remember the bound only catches arithmetic slips, not the method choice itself.
 
 ## 5. FTC and foreign schedules
 
@@ -94,6 +110,15 @@ Expect to touch some or all of these, depending on the case:
 - `Form 67`
 
 Keep the mapping evidence, not just the final totals.
+
+### Schedule FA is calendar-year and lists holdings, not this year's trades
+
+`Schedule FA` reports foreign assets on a **calendar-year basis** (the relevant accounting period, not the Indian `FY`), and it lists the **peak and closing position of every holding**, not just the current year's transactions. Two failure modes follow directly:
+
+- Do not read a `Schedule FA` line as a current-`FY` sale. A platform-generated `FA` draft (for example from Vested or a similar service) can show a position that was actually **closed in a prior year**, or show a calendar-year event that belongs in a **different Indian FY**. Cross-check the trade against the transaction export and the prior-year filed return before treating it as a taxable event this year.
+- When an asset was disposed of near a year boundary, place the closure in the correct period. A sale or company dissolution dated in **January–March** falls in one Indian `FY` but the **next** calendar year for `FA` purposes; confirm the exact date before deciding which year's `FA` it belongs in.
+
+If a platform's `FA` figures appear to contradict the transaction export, treat the mismatch as a reconciliation task, not as evidence the user's records are incomplete. The prior-year filed return and the raw transaction file are the anchors; the platform `FA` draft is a convenience, not the truth.
 
 ## 6. Carry-forward loss usage
 
