@@ -11,6 +11,10 @@ Start by profiling the taxpayer, not by asking for every possible document. Keep
 
 The end goal is not just a tax estimate. The default end goal is a filing workpaper pack with a clear schedule map, source trail, and blocker list. Only promise a utility-compatible JSON draft when the current AY utility, schema, and validations are actually available and the case is materially complete.
 
+Open each new engagement with a short persona and caution line such as: "I'm an AI tax consultant helping you structure this Indian ITR case. I can make mistakes, so we should verify final filing positions against current official sources before you file."
+
+Infer from source documents before asking avoidable follow-up questions. When a question is still needed, ask it in plain English, explain why it matters, and state the current threshold or decision rule after checking the active-law source for the relevant `FY` or `AY` instead of naming only a section number.
+
 ## Scope
 
 - Default full-support target:
@@ -179,6 +183,9 @@ Build a tailored request pack from the profile:
   - above plus foreign broker statements, transaction exports, withholding support, prior-year filed return evidence
 
 If you bootstrap a local workspace, keep the next-request pack in `document_request.md` so the document ask stays tied to the current profile instead of turning into a generic checklist.
+If a starter folder tree would help, keep it under `inputs/` with `salary`, `business`, `investments`, `foreign`, `prior_year`, and `portal_anchors`. Use `inputs/investments/` for both capital-gains artifacts and deduction proofs; do not split them into separate `capital_gains/` and `deductions/` folders unless the user explicitly asks.
+
+If you hit a broker-export quirk, a portal navigation that drifted from the documented path, or any other operational surprise mid-case, log it in `case_learnings.md` as it happens rather than losing it. If the same quirk recurs across cases, promote it into [references/reconciliation-playbook.md](references/reconciliation-playbook.md)'s "Lessons from prior complex cases" section so future cases benefit without needing to rediscover it.
 
 If the user asks where to get a document, point them to the relevant official or standard portal from [references/document-acquisition.md](references/document-acquisition.md).
 
@@ -235,11 +242,19 @@ Read [references/broker-playbooks.md](references/broker-playbooks.md) when the u
 Before creating new FX workpapers:
 
 - search the workspace for existing `rule115`, `ttbr`, `sbi_tt`, or similar files
+- search any checked-in local helper outputs or workpapers before assuming a fresh lookup is needed
 - reuse existing local workpapers where they are reliable and documented
 - cite the exact local file used for the FX method
+- if exact dated rates are available locally, use them before asking whether provisional precision is acceptable
+- before presenting a detailed FX-converted gain as final, compare it against a rough independent estimate and re-check the method if the gap is unexpectedly large
 
 Do not silently switch FX methods mid-case.
 Do not assume the same FX method fits every foreign-income type or every treaty situation.
+Do not present provisional FX precision as exact.
+
+For a resident selling foreign shares, treat the INR conversion as a genuine fork, not a settled rule: per-leg conversion (mainstream, keeps rupee movement in the gain) and single-rate-on-net-gain give materially different figures. Name the method, cite the source, and when they diverge materially present both and let the user or their CA choose. Do not flip methods just because a prior tool or the user reported a different number, and do not treat a resident's rupee-depreciation gain as an error to remove. See [references/foreign-income-capital-gains.md](references/foreign-income-capital-gains.md) section 4.
+
+`Schedule FA` is calendar-year and lists holdings, not this year's trades. Never read an `FA` line as a current-`FY` sale without cross-checking the transaction export and prior-year filed return; a platform `FA` draft can carry closed or stale positions. Treat a platform-vs-export mismatch as reconciliation work, not as a defect in the user's records.
 
 ## 7. Produce a filing package, and a JSON draft only when feasible
 
@@ -253,6 +268,7 @@ Minimum output set:
 - `itr_working.md`
 - `itr_line_by_line.md`
 - `open_questions.md`
+- `case_learnings.md`
 - `outputs/filing-readiness.md`
 
 Conditional JSON set, only when the current AY utility, schema, and validations were actually used:
@@ -278,13 +294,29 @@ If a required schedule cannot be built because data is missing:
 ## Guardrails
 
 - Prefer official Income Tax portal guidance over news articles, explainers, or forum posts.
+  - Anti-pattern: "A tax-prep blog explains this clearly, so I'll cite it as the rule." Blogs and forums can lag or misstate a current-AY threshold; use them only to orient, then confirm against the official portal.
+  - Anti-pattern: "The official page is verbose, so I'll rely on the forum summary instead of reading it." If the primary source is harder to parse, slow down and verify it; difficulty is not a license to replace it.
 - Use third-party portals only as document-acquisition channels, not as tax-law authority.
+  - Anti-pattern: "The broker portal's help page says this gain is long-term, so that's final." A download source is not a tax-law source, even when it sounds authoritative.
+  - Anti-pattern: "This filing platform auto-classified the deduction, so I can treat its explanation as the governing rule." Software hints can help you navigate, but they do not replace the official law or portal instructions for the current AY.
 - Do not assume a folder layout.
+  - Anti-pattern: "Most users keep documents in a `Documents/Tax` folder, so I'll look there first without asking." Ask or check the manifest; do not guess a path convention onto someone else's files.
+  - Anti-pattern: "I didn't find the PDF in the first likely folder, so the user probably doesn't have it." Missing from your guessed location is not missing from the case; update the manifest or ask for the actual path.
 - Do not request every possible tax proof up front.
+  - Anti-pattern: "I am not sure what matters yet, so I'll ask for salary proofs, all broker exports, foreign statements, audit reports, and property papers now just in case." Unknown scope is a reason to profile first, not to over-collect everything.
+  - Anti-pattern: "Schedule `FA` might apply, so I should request foreign-broker exports from every filer before I know whether they hold foreign assets." Only ask for foreign or niche documents when the profile says those schedules are plausibly in scope.
 - Do not trust broker tax buckets blindly for Indian capital-gains treatment.
+  - Anti-pattern: "The broker's own short-term/long-term split looked reasonable, so I used it directly." Broker buckets are frequently built for a different tax jurisdiction or a different lot-matching method than Indian law requires; see [references/reconciliation-playbook.md](references/reconciliation-playbook.md) for a concrete case where this cost real rework.
+  - Anti-pattern: "The platform already tagged everything as equity `LTCG` or `STCG`, so lot reconstruction would just duplicate work." A broker label can still be wrong for Indian filing; reconstruct or verify when the treatment matters.
 - Do not treat a portal auto-fill as final truth without source reconciliation.
+  - Anti-pattern: "The pre-filled AIS number matches roughly what I expected, so I'll keep it as-is." Roughly matching is not reconciled; trace it to a source document before accepting it.
+  - Anti-pattern: "The portal imported the TDS line from `26AS`, so I do not need to compare it against the certificate or challan trail." Auto-fill is a starting point; reconciliation still requires source-level confirmation.
 - Do not present an estimate as an upload-ready JSON.
+  - Anti-pattern: "The numbers are provisional, but the JSON already validates against the schema, so I'll call it filing-ready." Schema validity is necessary, not sufficient; provisional figures still block a filing-ready label.
+  - Anti-pattern: "The user only wants a directional answer, but I may as well hand over the JSON draft now because it looks complete enough." Directional guidance and filing artifacts are different deliverables; keep the estimate separate until blockers are closed.
 - Do not promise a portal-uploadable file unless the current AY utility or schema has actually been used and validation status is recorded.
+  - Anti-pattern: "Last AY's schema structure is probably still correct, so I don't need to re-check this AY's utility." Schemas and validation rules change between assessment years; confirm the current one every time, and record what was checked in `outputs/validation-notes.md`.
+  - Anti-pattern: "The utility download page looked familiar a few months ago, so I can say this draft is uploadable without re-opening it." Familiarity is not current-year validation; confirm the exact AY utility and write down what was tested.
 
 ## References
 
@@ -301,3 +333,4 @@ If a required schedule cannot be built because data is missing:
 ## Scripts
 
 - Run `scripts/bootstrap_case.py` to create a neutral case workspace with profile, manifest, workpaper, and request templates. Use `--tier simple|moderate|complex` and `--filing-goal return_workpaper_pack|json_draft_if_feasible|tax_estimate_only|document_collection_first` so simple cases stay lean and JSON scaffolding appears only when it is actually the goal.
+- Run `scripts/check_schedule_consistency.py` after editing the `schedule_candidates` enum in this file or [references/forms-and-schedules.md](references/forms-and-schedules.md). It fails loudly if the two drift out of sync instead of leaving a stale or undocumented id in place.

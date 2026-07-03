@@ -13,6 +13,21 @@ BASE_CASE_DIRS = [
     "workpapers",
 ]
 
+INPUT_SUBDIRS = [
+    "salary",
+    "business",
+    "investments",
+    "foreign",
+    "prior_year",
+    "portal_anchors",
+]
+
+# A lean salary-style case should not spawn empty foreign/business/prior-year folders.
+LEAN_INPUT_SUBDIRS = [
+    "salary",
+    "investments",
+]
+
 
 PROFILE_TEMPLATE = """fy: {fy}
 ay: {ay}
@@ -334,6 +349,26 @@ Last updated: {today}
 """
 
 
+CASE_LEARNINGS_TEMPLATE = """# Case Learnings
+
+Last updated: {today}
+
+Log operational quirks discovered while working this case: broker-export gotchas,
+portal navigation that drifted from the documented path, schema surprises, anything
+that would save time on a similar future case. This is scratch, not tax law — do not
+record tax-treatment conclusions here.
+
+If a learning generalizes beyond this one case (recurs across clients, brokers, or
+AYs), promote it into the india-itr-filing skill's
+references/reconciliation-playbook.md, "Lessons from prior complex cases" section,
+instead of leaving it stuck in this file.
+
+## Entries
+
+-
+"""
+
+
 OPEN_QUESTIONS_TEMPLATE = """# Open Questions
 
 Last updated: {today}
@@ -447,6 +482,12 @@ def schedule_map_template(case_tier: str, filing_goal: str) -> str:
     return FULL_SCHEDULE_MAP_TEMPLATE
 
 
+def input_subdirs(case_tier: str, filing_goal: str) -> list[str]:
+    if case_tier == "simple" and not wants_json_scaffold(filing_goal):
+        return LEAN_INPUT_SUBDIRS
+    return INPUT_SUBDIRS
+
+
 def bootstrap_case(
     case_root: Path,
     fy: str,
@@ -458,6 +499,8 @@ def bootstrap_case(
     case_root.mkdir(parents=True, exist_ok=True)
     for relative_dir in BASE_CASE_DIRS:
         (case_root / relative_dir).mkdir(exist_ok=True)
+    for relative_dir in input_subdirs(case_tier, filing_goal):
+        (case_root / "inputs" / relative_dir).mkdir(exist_ok=True)
 
     today = date.today().isoformat()
     regime_position = default_regime_position(ay)
@@ -497,6 +540,11 @@ def bootstrap_case(
     write_text(
         case_root / "open_questions.md",
         OPEN_QUESTIONS_TEMPLATE.format(today=today),
+        overwrite,
+    )
+    write_text(
+        case_root / "case_learnings.md",
+        CASE_LEARNINGS_TEMPLATE.format(today=today),
         overwrite,
     )
 

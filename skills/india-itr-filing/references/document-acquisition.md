@@ -9,7 +9,8 @@
 5. Capital gains and investments
 6. Other sources and deductions
 7. Foreign assets and income
-8. Practical guidance for scattered documents
+8. Plain-English follow-up asks
+9. Practical guidance for scattered documents
 
 ## 1. Portal documents
 
@@ -129,6 +130,13 @@ Use only when the profile actually includes house-property income, loss, or rela
 - `Form 3CA-3CD`
 - `Form 3CB-3CD`
 - `Form 3CEB`
+
+When clarifying presumptive treatment or audit risk:
+
+- infer from invoices, books, `Form 16A`, and bank trail before asking a follow-up
+- do not ask only `Does your turnover cross 44AB?`
+- instead ask in plain English and say why it matters
+- check the current official threshold or decision rule for the active `FY` or `AY` before quoting it back
 
 ## 5. Capital gains and investments
 
@@ -250,6 +258,7 @@ Common source documents:
 - education-loan interest certificate
 
 Gather these only if the user is actually testing or claiming the deduction.
+If you are using the default starter scaffold, keep deduction proofs inside `inputs/investments/` with the related investment or tax-saving evidence instead of creating a separate `inputs/deductions/` folder.
 
 ## 7. Foreign assets and income
 
@@ -267,8 +276,18 @@ When FX conversion is needed:
 
 - search the workspace for local `SBI TTBR` or `Rule 115` workpapers before creating new ones
 - reuse existing documented local files where reliable
+- check dividend and withholding reports before asking the user whether foreign tax was withheld
 
-## 8. Practical guidance for scattered documents
+## 8. Plain-English follow-up asks
+
+Use these patterns when a follow-up is still needed after inspecting available documents.
+
+- `For your freelance or professional income, are you using the simpler presumptive route where we use a standard profit percentage, or are you keeping normal books and claiming actual expenses? This helps decide whether we stay in the simplified path or need full business schedules.`
+- `Are your business or professional receipts anywhere near the current tax-audit trigger for your year? I will confirm the exact threshold from current official sources before relying on it, because that affects whether audit reports belong in the request pack.`
+- `Your broker dividend statement usually shows this. Should I infer foreign tax withholding from that report, or do you already know that tax was withheld abroad on those dividends?`
+- `Is there any rental or house-property activity, or any crypto or VDA trading, that is not already visible in the documents?`
+
+## 9. Practical guidance for scattered documents
 
 If a user has documents spread across many folders:
 
@@ -277,3 +296,12 @@ If a user has documents spread across many folders:
 - mark what the document is required for and how urgent it is
 - ask for only the next high-value missing document
 - normalize data into local workpapers after review
+
+If a starter scaffold helps and the user does not already have a preferred structure, keep it under `inputs/`:
+
+- `inputs/salary/`
+- `inputs/business/`
+- `inputs/investments/` for capital-gains reports, mutual-fund statements, and deduction proofs
+- `inputs/foreign/`
+- `inputs/prior_year/`
+- `inputs/portal_anchors/`
