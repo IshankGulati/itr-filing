@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,9 +39,11 @@ class BootstrapCaseTests(unittest.TestCase):
                 False,
                 "simple",
                 "return_workpaper_pack",
+                "none",
             )
 
             schedule_map = (case_root / "schedule_map.md").read_text(encoding="utf-8")
+            profile = (case_root / "profile.yaml").read_text(encoding="utf-8")
 
             self.assertIn("## Core schedule candidates", schedule_map)
             self.assertNotIn("### Foreign schedules", schedule_map)
@@ -48,15 +51,17 @@ class BootstrapCaseTests(unittest.TestCase):
             self.assertTrue((case_root / "inputs" / "investments").exists())
             self.assertFalse((case_root / "inputs" / "capital_gains").exists())
             self.assertFalse((case_root / "inputs" / "deductions").exists())
-            # A lean case does not spawn empty foreign/business/prior-year folders.
             self.assertFalse((case_root / "inputs" / "foreign").exists())
             self.assertFalse((case_root / "inputs" / "business").exists())
             self.assertFalse((case_root / "inputs" / "prior_year").exists())
-            # A simple workpaper case stays lean (no JSON scaffold) but still tracks readiness.
+            self.assertFalse((case_root / "inputs" / "portal_anchors").exists())
             self.assertFalse((case_root / "outputs" / "itr-draft.json").exists())
             self.assertFalse((case_root / "outputs" / "validation-notes.md").exists())
             self.assertTrue((case_root / "outputs" / "filing-readiness.md").exists())
+            self.assertFalse((case_root / "outputs" / "portal-field-map.yaml").exists())
             self.assertTrue((case_root / "case_learnings.md").exists())
+            self.assertIn("execution_mode: none", profile)
+            self.assertIn("portal_fill_status: not_offered", profile)
 
     def test_json_targeted_case_gets_full_scaffold(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -68,6 +73,7 @@ class BootstrapCaseTests(unittest.TestCase):
                 False,
                 "complex",
                 "json_draft_if_feasible",
+                "none",
             )
 
             schedule_map = (case_root / "schedule_map.md").read_text(encoding="utf-8")
@@ -84,6 +90,74 @@ class BootstrapCaseTests(unittest.TestCase):
             self.assertTrue((case_root / "outputs" / "itr-draft.json").exists())
             self.assertTrue((case_root / "outputs" / "validation-notes.md").exists())
             self.assertTrue((case_root / "outputs" / "filing-readiness.md").exists())
+            self.assertFalse((case_root / "outputs" / "portal-field-map.yaml").exists())
+
+    def test_portal_enabled_case_gets_portal_scaffold(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir) / "portal-case"
+            bootstrap_case_module.bootstrap_case(
+                case_root,
+                "FY_2025-26",
+                "AY 2026-27",
+                False,
+                "simple",
+                "return_workpaper_pack",
+                "portal_draft_fill",
+            )
+
+            profile = (case_root / "profile.yaml").read_text(encoding="utf-8")
+            portal_packet = json.loads(
+                (case_root / "outputs" / "portal-field-map.yaml").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            self.assertTrue((case_root / "inputs" / "salary").exists())
+            self.assertTrue((case_root / "inputs" / "investments").exists())
+            self.assertTrue((case_root / "inputs" / "portal_anchors").exists())
+            self.assertFalse((case_root / "inputs" / "business").exists())
+            self.assertFalse((case_root / "inputs" / "foreign").exists())
+            self.assertFalse((case_root / "outputs" / "itr-draft.json").exists())
+            self.assertTrue((case_root / "outputs" / "filing-readiness.md").exists())
+            self.assertTrue((case_root / "outputs" / "portal-field-map.yaml").exists())
+            self.assertTrue((case_root / "outputs" / "portal-entry-plan.md").exists())
+            self.assertTrue((case_root / "outputs" / "portal-session-log.md").exists())
+            self.assertTrue((case_root / "outputs" / "portal-prefill-diff.md").exists())
+            self.assertIn("execution_mode: portal_draft_fill", profile)
+            self.assertIn("preferred_browser: unknown", profile)
+            self.assertIn("- login", profile)
+            self.assertEqual(
+                sorted(portal_packet.keys()),
+                sorted(
+                    [
+                        "metadata",
+                        "branch_questions",
+                        "part_a_general_information",
+                        "bank_details",
+                        "table_rows",
+                        "source_refs",
+                        "review_flags",
+                    ]
+                ),
+            )
+
+    def test_combined_execution_mode_creates_json_and_portal_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir) / "combined-case"
+            bootstrap_case_module.bootstrap_case(
+                case_root,
+                "FY_2025-26",
+                "AY 2026-27",
+                False,
+                "moderate",
+                "return_workpaper_pack",
+                "utility_json_and_portal_draft_fill",
+            )
+
+            self.assertTrue((case_root / "outputs" / "itr-draft.json").exists())
+            self.assertTrue((case_root / "outputs" / "validation-notes.md").exists())
+            self.assertTrue((case_root / "outputs" / "portal-field-map.yaml").exists())
+            self.assertTrue((case_root / "inputs" / "portal_anchors").exists())
 
 
 if __name__ == "__main__":

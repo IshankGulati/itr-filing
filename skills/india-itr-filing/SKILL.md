@@ -1,6 +1,6 @@
 ---
 name: india-itr-filing
-description: Profile an Indian income-tax return case, choose the likely ITR form, request only the relevant documents, guide the user to official or standard download sources, reconcile income head by head, and produce a filing workpaper pack for the current AY. When the current AY offline utility, schema, and validations are actually available and used, also produce a schema-tested ITR draft JSON. Use for Indian ITR work covering residents, non-residents, HUFs, business or profession cases, capital gains, mutual funds, broker statements, foreign investments held by Indian taxpayers, foreign assets or income, foreign tax credit, deductions, or carry-forward losses.
+description: Profile an Indian income-tax return case, choose the likely ITR form, request only the relevant documents, guide the user to official or standard download sources, reconcile income head by head, and produce a filing workpaper pack for the current AY. When the current AY offline utility, schema, and validations are actually available and used, also produce a schema-tested ITR draft JSON. After calculations are finalized, optionally assist with browser-based Income Tax portal draft filling for ITR-1 through ITR-4 while leaving login, OTP or 2FA, submit, e-verify, and payment to the human. Use for Indian ITR work covering residents, non-residents, HUFs, business or profession cases, capital gains, mutual funds, broker statements, foreign investments held by Indian taxpayers, foreign assets or income, foreign tax credit, deductions, or carry-forward losses.
 ---
 
 # India Itr Filing
@@ -9,7 +9,7 @@ description: Profile an Indian income-tax return case, choose the likely ITR for
 
 Start by profiling the taxpayer, not by asking for every possible document. Keep the workflow adaptive: simple salary-only cases should stay simple, while capital-gains, business, foreign-asset, or carry-forward-loss cases should expand only as needed.
 
-The end goal is not just a tax estimate. The default end goal is a filing workpaper pack with a clear schedule map, source trail, and blocker list. Only promise a utility-compatible JSON draft when the current AY utility, schema, and validations are actually available and the case is materially complete.
+The end goal is not just a tax estimate. The default end goal is a filing workpaper pack with a clear schedule map, source trail, and blocker list. Only promise a utility-compatible JSON draft when the current AY utility, schema, and validations are actually available and the case is materially complete. If the workpapers are ready and the user explicitly opts in, this skill can also prepare and drive a portal draft-fill pass for `ITR-1` through `ITR-4` without taking over human-only steps.
 
 Open each new engagement with a short persona and caution line such as: "I'm an AI tax consultant helping you structure this Indian ITR case. I can make mistakes, so we should verify final filing positions against current official sources before you file."
 
@@ -37,10 +37,11 @@ Foreign scope in this skill is limited to Indian taxpayers who hold foreign inve
 2. Read [references/return-form-taxonomy.md](references/return-form-taxonomy.md).
 3. Read [references/intake-checklist.md](references/intake-checklist.md).
 4. Read [references/case-buckets.md](references/case-buckets.md) if you need a first-pass archetype for the user.
-5. Read [references/forms-and-schedules.md](references/forms-and-schedules.md) before mapping work into a filing-ready JSON.
-6. Read [references/broker-playbooks.md](references/broker-playbooks.md) when broker or platform-specific exports matter.
-7. If a local workspace would help, run `scripts/bootstrap_case.py <case-root> --fy FY_2025-26 --ay "AY 2026-27" --tier simple` for a lean starter or switch `--tier` / `--filing-goal` when the case is more complex or JSON-targeted.
-8. If the user already has files scattered across different folders, do not force a folder migration. Keep a manifest with absolute paths instead.
+5. Read [references/forms-and-schedules.md](references/forms-and-schedules.md) before mapping work into a filing-ready JSON or portal packet.
+6. Read [references/portal-draft-filling.md](references/portal-draft-filling.md) before starting any live browser-based portal drafting.
+7. Read [references/broker-playbooks.md](references/broker-playbooks.md) when broker or platform-specific exports matter.
+8. If a local workspace would help, run `scripts/bootstrap_case.py <case-root> --fy FY_2025-26 --ay "AY 2026-27" --tier simple` for a lean starter or switch `--tier`, `--filing-goal`, or `--execution-mode` when the case is more complex, JSON-targeted, or portal-draft-targeted.
+9. If the user already has files scattered across different folders, do not force a folder migration. Keep a manifest with absolute paths instead.
 
 ## Workflow
 
@@ -62,6 +63,32 @@ Capture at least:
   - `json_draft_if_feasible`
   - `tax_estimate_only`
   - `document_collection_first`
+- `execution_mode`
+  - `none`
+  - `utility_json`
+  - `portal_draft_fill`
+  - `utility_json_and_portal_draft_fill`
+- `portal_fill_status`
+  - `not_offered`
+  - `offered`
+  - `accepted`
+  - `in_progress`
+  - `paused`
+  - `ready_for_user_review`
+  - `completed_pending_user_submit`
+  - `abandoned`
+- `preferred_browser`
+  - `chrome`
+  - `system_default`
+  - `unknown`
+- `login_state`
+  - `unknown`
+  - `human_not_logged_in`
+  - `human_logged_in`
+- `human_only_steps`
+  - default to `login`, `otp_or_2fa`, `final_submit`, `e_verify`, and `tax_payment`
+- `last_completed_portal_section`
+  - free-text checkpoint for resume
 - `case_tier`
   - `simple`
   - `moderate`
@@ -140,6 +167,7 @@ Capture at least:
 Do not ask for broker exports, foreign schedules, or audit reports unless the profile says they matter.
 Keep `si` separate from `spi`: `si` tracks special-rate income, while `spi` remains the clubbing or specified-person schedule.
 If the user is unsure whether they need to file at all, verify current mandatory-filing triggers from official sources before collecting a large document pack.
+Keep `filing_goal` semantically separate from `execution_mode`: the first describes the deliverable, while the second describes whether utility JSON and/or portal drafting help should be prepared after the calculations are ready.
 
 ## 2. Choose the likely ITR form
 
@@ -276,6 +304,13 @@ Conditional JSON set, only when the current AY utility, schema, and validations 
 - `outputs/itr-draft.json`
 - `outputs/validation-notes.md`
 
+Conditional portal-draft set, only when `execution_mode` includes `portal_draft_fill`:
+
+- `outputs/portal-field-map.yaml`
+- `outputs/portal-entry-plan.md`
+- `outputs/portal-session-log.md`
+- `outputs/portal-prefill-diff.md`
+
 Use the official downloads page, offline-utility manual, and current AY schema from [references/official-links.md](references/official-links.md) whenever the form family is `ITR-1/2/3/4`.
 
 Only call `outputs/itr-draft.json` schema-tested when:
@@ -290,6 +325,22 @@ If a required schedule cannot be built because data is missing:
 - stop short of inventing values
 - mark the draft as blocked
 - keep `open_questions.md` crisp and actionable
+
+## 8. Offer optional portal draft filling only after readiness is green
+
+Read [references/portal-draft-filling.md](references/portal-draft-filling.md) before any live browser work.
+
+Working rule:
+
+- only offer portal drafting after `outputs/filing-readiness.md` says the case is ready for manual portal or utility entry
+- require an explicit user opt-in before starting the live browser phase
+- support live portal drafting only for `ITR-1` through `ITR-4` in v1
+- treat `outputs/portal-field-map.yaml` as the machine-readable source of truth for branch-driving answers, ready field packets, and row-ready tables
+- inspect the portal's prefilled state first, record differences in `outputs/portal-prefill-diff.md`, then edit only mismatches
+- keep `outputs/portal-session-log.md` current so the run can resume after interruption
+- stop at preview or final review and hand back login, OTP or `2FA`, submit, `e-Verify`, and tax payment to the human
+
+When portal drafting is in scope, `inputs/portal_anchors/` should hold portal-only observations such as screenshots, copied labels, warnings, prefilled rows, validated bank-account notes, and section drift notes.
 
 ## Guardrails
 
@@ -311,6 +362,9 @@ If a required schedule cannot be built because data is missing:
 - Do not treat a portal auto-fill as final truth without source reconciliation.
   - Anti-pattern: "The pre-filled AIS number matches roughly what I expected, so I'll keep it as-is." Roughly matching is not reconciled; trace it to a source document before accepting it.
   - Anti-pattern: "The portal imported the TDS line from `26AS`, so I do not need to compare it against the certificate or challan trail." Auto-fill is a starting point; reconciliation still requires source-level confirmation.
+- Do not cross the human-only boundary in the live portal phase.
+  - Anti-pattern: "The user is already logged in, so I may as well click through submit and `e-Verify` too." The live browser phase ends at review; login, OTP or `2FA`, submit, `e-Verify`, and payment stay with the human.
+  - Anti-pattern: "The portal asked for a payment or security step, but it is probably fine to continue because the numbers are ready." A ready packet is not authorization to perform human-only actions.
 - Do not present an estimate as an upload-ready JSON.
   - Anti-pattern: "The numbers are provisional, but the JSON already validates against the schema, so I'll call it filing-ready." Schema validity is necessary, not sufficient; provisional figures still block a filing-ready label.
   - Anti-pattern: "The user only wants a directional answer, but I may as well hand over the JSON draft now because it looks complete enough." Directional guidance and filing artifacts are different deliverables; keep the estimate separate until blockers are closed.
@@ -326,11 +380,13 @@ If a required schedule cannot be built because data is missing:
 - Read [references/case-buckets.md](references/case-buckets.md) for first-pass user archetypes.
 - Read [references/document-acquisition.md](references/document-acquisition.md) for common document download paths by income head.
 - Read [references/forms-and-schedules.md](references/forms-and-schedules.md) for common statutory forms, source documents, and likely schedules.
+- Read [references/portal-draft-filling.md](references/portal-draft-filling.md) for portal offer language, readiness gates, pause or resume rules, and human-only boundaries.
 - Read [references/broker-playbooks.md](references/broker-playbooks.md) for broker and platform export patterns and extension guidance.
 - Read [references/reconciliation-playbook.md](references/reconciliation-playbook.md) for ordering, anti-patterns, and definition of done.
 - Read [references/foreign-income-capital-gains.md](references/foreign-income-capital-gains.md) for lot reconstruction, FX, FTC, and prior-year loss handling.
 
 ## Scripts
 
-- Run `scripts/bootstrap_case.py` to create a neutral case workspace with profile, manifest, workpaper, and request templates. Use `--tier simple|moderate|complex` and `--filing-goal return_workpaper_pack|json_draft_if_feasible|tax_estimate_only|document_collection_first` so simple cases stay lean and JSON scaffolding appears only when it is actually the goal.
+- Run `scripts/bootstrap_case.py` to create a neutral case workspace with profile, manifest, workpaper, and request templates. Use `--tier simple|moderate|complex`, `--filing-goal return_workpaper_pack|json_draft_if_feasible|tax_estimate_only|document_collection_first`, and `--execution-mode none|utility_json|portal_draft_fill|utility_json_and_portal_draft_fill` so the scaffold matches the intended delivery and post-calculation execution path.
+- Run `scripts/check_portal_packet.py` before live portal drafting. It exits immediately when `execution_mode` excludes portal filling, and otherwise checks that the filing pack, schedule statuses, and portal packet are ready for a real browser session.
 - Run `scripts/check_schedule_consistency.py` after editing the `schedule_candidates` enum in this file or [references/forms-and-schedules.md](references/forms-and-schedules.md). It fails loudly if the two drift out of sync instead of leaving a stale or undocumented id in place.

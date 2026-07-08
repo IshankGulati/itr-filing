@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 from datetime import date
 from pathlib import Path
 
@@ -28,11 +29,74 @@ LEAN_INPUT_SUBDIRS = [
     "investments",
 ]
 
+EXECUTION_MODE_CHOICES = [
+    "none",
+    "utility_json",
+    "portal_draft_fill",
+    "utility_json_and_portal_draft_fill",
+]
+
+PORTAL_EXECUTION_MODES = {
+    "portal_draft_fill",
+    "utility_json_and_portal_draft_fill",
+}
+
+UTILITY_JSON_EXECUTION_MODES = {
+    "utility_json",
+    "utility_json_and_portal_draft_fill",
+}
+
+PORTAL_HUMAN_ONLY_STEPS = [
+    "login",
+    "otp_or_2fa",
+    "final_submit",
+    "e_verify",
+    "tax_payment",
+]
+
+PORTAL_SCHEDULE_IDS = [
+    "salary",
+    "hp",
+    "bp",
+    "cg",
+    "os",
+    "vda",
+    "ei",
+    "via",
+    "si",
+    "al",
+    "fa",
+    "fsi",
+    "tr",
+    "tds_salary",
+    "tds_other",
+    "tcs",
+    "it_paid",
+    "bfla",
+    "cyla",
+    "cfl",
+    "spi",
+    "pti",
+    "amt",
+    "amtc",
+]
+
 
 PROFILE_TEMPLATE = """fy: {fy}
 ay: {ay}
 return_mode: unknown
 filing_goal: {filing_goal}
+execution_mode: {execution_mode}
+portal_fill_status: not_offered
+preferred_browser: unknown
+login_state: unknown
+human_only_steps:
+  - login
+  - otp_or_2fa
+  - final_submit
+  - e_verify
+  - tax_payment
+last_completed_portal_section: ""
 case_tier: {case_tier}
 taxpayer_type: unknown
 residential_status: unknown
@@ -79,6 +143,7 @@ Last updated: {today}
 
 - Return being prepared:
 - Output target:
+- Execution mode:
 - Likely ITR form:
 - Reason:
 
@@ -151,6 +216,7 @@ Last updated: {today}
 
 - Filing readiness:
 - JSON readiness:
+- Portal draft readiness:
 - Main blocker:
 
 ## Income heads
@@ -214,6 +280,8 @@ Last updated: {today}
 - Return mode:
 - Likely ITR form:
 - Filing goal:
+- Execution mode:
+- Status vocabulary: `out_of_scope | provisional | filing_ready | portal_ready | blocked`
 
 ## Core schedule candidates
 
@@ -275,6 +343,8 @@ Last updated: {today}
 - Return mode:
 - Likely ITR form:
 - Filing goal:
+- Execution mode:
+- Status vocabulary: `out_of_scope | provisional | filing_ready | portal_ready | blocked`
 
 ## Schedule candidates
 
@@ -385,7 +455,7 @@ Last updated: {today}
 
 - 
 
-## Utility or JSON blockers
+## Utility, JSON, or portal blockers
 
 - 
 """
@@ -412,6 +482,84 @@ Fill this only after `profile.yaml` is updated.
 - `AIS` and `TIS` current common path: Login > AIS
 - Offline utility manual: https://www.incometax.gov.in/iec/foportal/help/offline-utility
 - Current AY utilities and schema: https://www.incometax.gov.in/iec/foportal/downloads
+- Portal-only screenshots, copied labels, and prefill notes belong in `inputs/portal_anchors/` when live portal drafting is in scope.
+"""
+
+
+VALIDATION_NOTES_TEMPLATE = """# Validation Notes
+
+- Current AY utility used:
+- Schema used:
+- Validation result:
+- Draft status:
+- Portal packet validated:
+- Remaining blockers:
+"""
+
+
+FILING_READINESS_TEMPLATE = """# Filing Readiness
+
+- Output target:
+- Execution mode:
+- Utility available for current AY:
+- Draft JSON attempted:
+- Ready for manual portal or utility entry:
+- Portal fill readiness:
+- Remaining blockers:
+"""
+
+
+PORTAL_ENTRY_PLAN_TEMPLATE = """# Portal Entry Plan
+
+Last updated: {today}
+
+Use this only after `outputs/filing-readiness.md` says the case is ready for manual
+portal or utility entry and the user explicitly opted into live portal drafting.
+
+## Default order
+
+1. Prefill inspection
+2. Part A and profile questions
+3. Branch-driving questions
+4. Income schedules
+5. Taxes and credits
+6. Foreign or advanced schedules if present
+7. Bank and refund review
+8. Preview stop point for human review
+
+## Human-only boundaries
+
+- Human logs in and completes any OTP or 2FA.
+- Human performs final submit, `e-Verify`, and tax payment.
+- Agent stops at preview or final review and does not click through the human-only steps.
+"""
+
+
+PORTAL_SESSION_LOG_TEMPLATE = """# Portal Session Log
+
+Last updated: {today}
+
+## Current state
+
+- Current page:
+- Completed sections:
+- Rows entered:
+- Last checkpoint:
+- Next checkpoint:
+- Pause reason:
+"""
+
+
+PORTAL_PREFILL_DIFF_TEMPLATE = """# Portal Prefill Diff
+
+Last updated: {today}
+
+Record portal-prepopulated values versus the workpaper source of truth before or during
+live entry. Use action labels `keep`, `update`, or `add`.
+
+| Section | Portal value | Workpaper value | Action | Source ref | Notes |
+| --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |
 """
 
 
@@ -462,30 +610,165 @@ def default_regime_position(ay: str) -> str:
     return "unknown"
 
 
-def wants_json_scaffold(filing_goal: str) -> bool:
-    return filing_goal == "json_draft_if_feasible"
+def wants_portal_scaffold(execution_mode: str) -> bool:
+    return execution_mode in PORTAL_EXECUTION_MODES
 
 
-def wants_filing_readiness(case_tier: str, filing_goal: str) -> bool:
-    # filing-readiness.md tracks readiness of the workpaper pack, so it belongs to any
-    # filing-targeted goal regardless of tier. This keeps SKILL.md's minimum output set and
-    # intake-checklist ("for filing-targeted cases") consistent with what the script produces.
-    return filing_goal in {
-        "return_workpaper_pack",
-        "json_draft_if_feasible",
-    }
+def wants_json_scaffold(filing_goal: str, execution_mode: str) -> bool:
+    return (
+        filing_goal == "json_draft_if_feasible"
+        or execution_mode in UTILITY_JSON_EXECUTION_MODES
+    )
 
 
-def schedule_map_template(case_tier: str, filing_goal: str) -> str:
-    if case_tier == "simple" and not wants_json_scaffold(filing_goal):
+def wants_filing_readiness(filing_goal: str, execution_mode: str) -> bool:
+    return (
+        filing_goal == "return_workpaper_pack"
+        or wants_json_scaffold(filing_goal, execution_mode)
+        or wants_portal_scaffold(execution_mode)
+    )
+
+
+def schedule_map_template(
+    case_tier: str,
+    filing_goal: str,
+    execution_mode: str,
+) -> str:
+    if (
+        case_tier == "simple"
+        and not wants_json_scaffold(filing_goal, execution_mode)
+    ):
         return LEAN_SCHEDULE_MAP_TEMPLATE
     return FULL_SCHEDULE_MAP_TEMPLATE
 
 
-def input_subdirs(case_tier: str, filing_goal: str) -> list[str]:
-    if case_tier == "simple" and not wants_json_scaffold(filing_goal):
-        return LEAN_INPUT_SUBDIRS
-    return INPUT_SUBDIRS
+def input_subdirs(case_tier: str, filing_goal: str, execution_mode: str) -> list[str]:
+    if (
+        case_tier == "simple"
+        and not wants_json_scaffold(filing_goal, execution_mode)
+    ):
+        subdirs = list(LEAN_INPUT_SUBDIRS)
+    else:
+        subdirs = list(INPUT_SUBDIRS)
+
+    if wants_portal_scaffold(execution_mode) and "portal_anchors" not in subdirs:
+        subdirs.append("portal_anchors")
+
+    return subdirs
+
+
+def portal_field_map_content(
+    fy: str,
+    ay: str,
+    execution_mode: str,
+) -> str:
+    schedule_field_packets = {
+        schedule_id: {
+            "status": "",
+            "summary": "",
+            "source_refs": [],
+        }
+        for schedule_id in PORTAL_SCHEDULE_IDS
+    }
+    portal_field_map = {
+        "metadata": {
+            "fy": fy,
+            "ay": ay,
+            "likely_itr_form": "",
+            "return_mode": "",
+            "execution_mode": execution_mode,
+            "portal_fill_status": "not_offered",
+            "preferred_browser": "unknown",
+            "login_state": "unknown",
+            "last_completed_portal_section": "",
+            "human_only_steps": PORTAL_HUMAN_ONLY_STEPS,
+            "in_scope_schedules": [],
+            "schedule_field_packets": schedule_field_packets,
+        },
+        "branch_questions": {
+            "presumptive_route": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "audit_applicable": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "transfer_pricing_applicable": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "director_in_company": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "partner_in_firm_or_llp": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "foreign_assets_or_signing_authority": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "foreign_tax_credit_claimed": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "unlisted_shares_held": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+            "refund_account_selected": {
+                "value": None,
+                "source": "",
+                "notes": "",
+            },
+        },
+        "part_a_general_information": {
+            "filing_status": {
+                "due_date": "",
+                "filed_under": "",
+                "revised_or_updated_path": "",
+            },
+            "taxpayer_profile": {
+                "residential_status": "",
+                "regime_position": "",
+                "business_income_current_ay": None,
+            },
+            "audit_information": {
+                "liable_44aa": None,
+                "liable_44ab": None,
+                "liable_92e": None,
+            },
+        },
+        "bank_details": {
+            "refund_account_choice": {
+                "account_last4": "",
+                "ifsc": "",
+                "source": "",
+                "status": "required",
+            },
+            "validated_accounts": [],
+            "notes": "",
+        },
+        "table_rows": {
+            "director_companies": [],
+            "unlisted_equity_rows": [],
+            "capital_gain_rows": [],
+            "foreign_asset_rows": [],
+        },
+        "source_refs": [],
+        "review_flags": [],
+    }
+    return json.dumps(portal_field_map, indent=2) + "\n"
 
 
 def bootstrap_case(
@@ -495,11 +778,12 @@ def bootstrap_case(
     overwrite: bool,
     case_tier: str,
     filing_goal: str,
+    execution_mode: str,
 ) -> None:
     case_root.mkdir(parents=True, exist_ok=True)
     for relative_dir in BASE_CASE_DIRS:
         (case_root / relative_dir).mkdir(exist_ok=True)
-    for relative_dir in input_subdirs(case_tier, filing_goal):
+    for relative_dir in input_subdirs(case_tier, filing_goal, execution_mode):
         (case_root / "inputs" / relative_dir).mkdir(exist_ok=True)
 
     today = date.today().isoformat()
@@ -511,6 +795,7 @@ def bootstrap_case(
             fy=fy,
             ay=ay,
             filing_goal=filing_goal,
+            execution_mode=execution_mode,
             case_tier=case_tier,
             regime_position=regime_position,
         ),
@@ -534,7 +819,7 @@ def bootstrap_case(
     )
     write_text(
         case_root / "schedule_map.md",
-        schedule_map_template(case_tier, filing_goal).format(today=today),
+        schedule_map_template(case_tier, filing_goal, execution_mode).format(today=today),
         overwrite,
     )
     write_text(
@@ -548,10 +833,13 @@ def bootstrap_case(
         overwrite,
     )
 
-    if wants_filing_readiness(case_tier, filing_goal) or wants_json_scaffold(filing_goal):
+    if wants_filing_readiness(filing_goal, execution_mode) or wants_json_scaffold(
+        filing_goal,
+        execution_mode,
+    ):
         (case_root / "outputs").mkdir(exist_ok=True)
 
-    if wants_json_scaffold(filing_goal):
+    if wants_json_scaffold(filing_goal, execution_mode):
         write_text(
             case_root / "outputs" / "itr-draft.json",
             JSON_TEMPLATE,
@@ -559,14 +847,36 @@ def bootstrap_case(
         )
         write_text(
             case_root / "outputs" / "validation-notes.md",
-            "# Validation Notes\n\n- Current AY utility used:\n- Schema used:\n- Validation result:\n- Draft status:\n- Remaining blockers:\n",
+            VALIDATION_NOTES_TEMPLATE,
             overwrite,
         )
 
-    if wants_filing_readiness(case_tier, filing_goal):
+    if wants_filing_readiness(filing_goal, execution_mode):
         write_text(
             case_root / "outputs" / "filing-readiness.md",
-            "# Filing Readiness\n\n- Output target:\n- Utility available for current AY:\n- Draft JSON attempted:\n- Ready for manual portal or utility entry:\n- Remaining blockers:\n",
+            FILING_READINESS_TEMPLATE,
+            overwrite,
+        )
+
+    if wants_portal_scaffold(execution_mode):
+        write_text(
+            case_root / "outputs" / "portal-field-map.yaml",
+            portal_field_map_content(fy, ay, execution_mode),
+            overwrite,
+        )
+        write_text(
+            case_root / "outputs" / "portal-entry-plan.md",
+            PORTAL_ENTRY_PLAN_TEMPLATE.format(today=today),
+            overwrite,
+        )
+        write_text(
+            case_root / "outputs" / "portal-session-log.md",
+            PORTAL_SESSION_LOG_TEMPLATE.format(today=today),
+            overwrite,
+        )
+        write_text(
+            case_root / "outputs" / "portal-prefill-diff.md",
+            PORTAL_PREFILL_DIFF_TEMPLATE.format(today=today),
             overwrite,
         )
 
@@ -596,6 +906,12 @@ def parse_args() -> argparse.Namespace:
         help="Primary deliverable goal for the scaffolded case",
     )
     parser.add_argument(
+        "--execution-mode",
+        choices=EXECUTION_MODE_CHOICES,
+        default="none",
+        help="Optional post-calculation execution support for utility JSON and/or portal draft filling",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite starter files if they already exist",
@@ -612,6 +928,7 @@ def main() -> None:
         args.overwrite,
         args.tier,
         args.filing_goal,
+        args.execution_mode,
     )
 
 

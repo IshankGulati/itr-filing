@@ -19,6 +19,7 @@ Ask these before asking for documents.
 - Is the taxpayer `resident`, `RNOR`, `non-resident`, or unsure?
 - Is the user trying to file an original return, belated return, revised return, or updated return?
 - Is the target output a filing workpaper pack, a schema-tested draft JSON if feasible, or only a tax estimate?
+- Once the calculations are ready, should the case stay workpaper-only, prepare a utility JSON path, or also prepare for optional portal draft filling?
 - If the user is unsure whether filing is mandatory, do we need to verify current filing triggers from official sources first?
 
 ## 2. Follow-up question style
@@ -193,3 +194,10 @@ For JSON-targeted cases also create:
 
 - `outputs/itr-draft.json`
 - `outputs/validation-notes.md`
+
+For portal-draft-targeted cases also create:
+
+- `outputs/portal-field-map.yaml`
+- `outputs/portal-entry-plan.md`
+- `outputs/portal-session-log.md`
+- `outputs/portal-prefill-diff.md`

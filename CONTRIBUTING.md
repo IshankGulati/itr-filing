@@ -1,8 +1,9 @@
 # Contributing
 
-Keep changes aligned with the skill's two core constraints:
+Keep changes aligned with the skill's core constraints:
 
 - Default to a filing workpaper pack. Only add draft `ITR` JSON behavior when the current-`AY` utility, schema, and validation workflow are actually available and actually used.
+- Keep live portal drafting optional, user-approved, and stopped before human-only steps such as login, OTP or `2FA`, submit, `e-Verify`, and payment.
 - Keep simple cases simple. Do not add broker-, foreign-, or advanced-schedule scaffolding to every path by default.
 
 ## Contribution Rules
@@ -37,4 +38,10 @@ Run the schedule-consistency tests when changing schedule ids, schedule docs, or
 
 ```bash
 python3 skills/india-itr-filing/scripts/test_check_schedule_consistency.py
+```
+
+Run the portal-packet tests when changing execution-mode logic, portal artifacts, or live-entry validation rules:
+
+```bash
+python3 skills/india-itr-filing/scripts/test_check_portal_packet.py
 ```

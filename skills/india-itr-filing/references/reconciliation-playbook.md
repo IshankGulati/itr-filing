@@ -77,7 +77,9 @@ The working produced useful scenario estimates before all blockers were closed, 
 
 ## 4. Definition of done
 
-Call the case filing-ready only when all of the following are true:
+### `filing_ready`
+
+Call the case `filing_ready` only when all of the following are true:
 
 - likely ITR form is identified and justified
 - all major income buckets are tied to source documents
@@ -87,3 +89,21 @@ Call the case filing-ready only when all of the following are true:
 - the output target is clear, especially whether the result is a manual-entry workpaper pack or a schema-tested draft JSON
 - open questions are either resolved or clearly immaterial
 - the final note states what is still assumption-driven, if anything
+
+### `portal_fill_ready`
+
+Call the case `portal_fill_ready` only when all `filing_ready` conditions are true and:
+
+- `outputs/filing-readiness.md` explicitly says the case is ready for manual portal or utility entry
+- branch-driving portal questions are answered explicitly
+- row-ready data exists for any portal tables that are in scope
+- `outputs/portal-entry-plan.md` and `outputs/portal-field-map.yaml` are ready enough to drive a deterministic session
+
+### `portal_draft_completed_pending_user_submit`
+
+Call the case `portal_draft_completed_pending_user_submit` only when all `portal_fill_ready` conditions are true and:
+
+- the live browser pass reached preview or final review
+- the portal prefill state versus workpaper state was recorded
+- the session log shows the last completed section and the exact handoff point
+- all remaining actions are human-only steps such as login completion, OTP or `2FA`, submit, `e-Verify`, or payment

@@ -195,4 +195,5 @@ Keep `SI` separate from `SPI`: `SI` is the special-rate income schedule, while `
 - `AMTC`
 
 If a case is only a tax estimate, the schedule list can stay provisional. If the case is targeting a utility draft or portal-entry pack, the schedule list must become explicit before the final handoff.
+If the case is targeting a portal-entry pack, schedule-level prose is not enough. The handoff should also include explicit field-level answers for branch-driving questions and row-ready data for portal tables such as unlisted shares, capital gains, director-company disclosures, and foreign assets when those sections are in scope.
 Do not collapse `VDA` into normal capital gains or other sources. Treat it as a dedicated special-rate area and confirm current-law restrictions on deductions, set-off, and carry-forward before computing it.

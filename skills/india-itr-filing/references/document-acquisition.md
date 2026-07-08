@@ -305,3 +305,11 @@ If a starter scaffold helps and the user does not already have a preferred struc
 - `inputs/foreign/`
 - `inputs/prior_year/`
 - `inputs/portal_anchors/`
+
+Use `inputs/portal_anchors/` specifically for portal-only observations gathered during live drafting:
+
+- screenshots of portal states or warnings
+- copied labels when the portal wording drifts from the documented path
+- notes on validated bank accounts or refund-account choices
+- snapshots of prefilled tables before editing
+- page-specific resume notes for interrupted sessions

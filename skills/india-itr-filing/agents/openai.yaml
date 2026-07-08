@@ -1,4 +1,4 @@
 interface:
   display_name: "India ITR Filing"
-  short_description: "Profile case, gather docs, build filing pack"
-  default_prompt: "Use $india-itr-filing to profile this tax case, gather only the needed documents, build a filing workpaper pack, and create a draft ITR JSON only when the current AY utility, schema, and validation workflow are actually available and actually used."
+  short_description: "Profile case, gather docs, build filing pack, optionally draft portal entry"
+  default_prompt: "Use $india-itr-filing to profile this tax case, gather only the needed documents, build a filing workpaper pack, create a draft ITR JSON only when the current AY utility, schema, and validation workflow are actually available and actually used, and once readiness is green ask whether the user wants optional portal draft filling in their own browser. Never log in, complete OTP or 2FA, submit, e-verify, or pay on the user's behalf."
