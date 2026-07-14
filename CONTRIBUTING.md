@@ -5,6 +5,7 @@ Keep changes aligned with the skill's core constraints:
 - Default to a filing workpaper pack. Only add draft `ITR` JSON behavior when the current-`AY` utility, schema, and validation workflow are actually available and actually used.
 - Keep live portal drafting optional, user-approved, and stopped before human-only steps such as login, OTP or `2FA`, submit, `e-Verify`, and payment.
 - Keep simple cases simple. Do not add broker-, foreign-, or advanced-schedule scaffolding to every path by default.
+- Keep `schedule_candidates` high-level. Put portal-only screen logic in the persona-policy layer and `schedule_inventory.yaml`, not in the schedule enum.
 
 ## Contribution Rules
 
@@ -12,6 +13,7 @@ Keep changes aligned with the skill's core constraints:
 - Keep references harness-neutral. The workflow belongs in `SKILL.md`; harness metadata in `agents/` should stay additive.
 - Add provider-specific knowledge as a new focused reference instead of rewriting the base skill around one broker, fund platform, or employer equity tool.
 - Prefer manifest-first intake, explicit blockers, and schedule-level traceability over opaque summary outputs.
+- When portal behavior changes, update `scripts/persona_policy.py`, the relevant portal references, and the validator together so screen modes, stale-selection rules, and docs do not drift.
 
 ## Adding A Broker Or Platform
 
@@ -23,6 +25,7 @@ Keep changes aligned with the skill's core constraints:
 
 - Use `references/` for durable guidance or playbooks.
 - Use `scripts/` for reusable operational tooling such as validators, consistency checks, or workspace bootstrap helpers.
+- Use `scripts/persona_policy.py` for shared persona-module logic, screen-mode defaults, and stale-selection policy instead of duplicating those rules across scripts.
 - Touch `SKILL.md` only when the base workflow itself needs to change for all users, not just one provider or one edge case.
 - Keep agent metadata additive in `agents/`.
 
@@ -44,4 +47,10 @@ Run the portal-packet tests when changing execution-mode logic, portal artifacts
 
 ```bash
 python3 skills/india-itr-filing/scripts/test_check_portal_packet.py
+```
+
+Run the persona-policy fixtures when changing module composition, starter screen inventory, or stale-selection defaults:
+
+```bash
+python3 skills/india-itr-filing/scripts/test_persona_policy.py
 ```

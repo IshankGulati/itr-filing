@@ -1,0 +1,93 @@
+[
+  {
+    "name": "salary_only",
+    "modules": ["salary_basic"],
+    "must_select_contains": ["salary"],
+    "must_deselect_contains": [],
+    "screen_modes": {
+      "Schedule Salary": "manual_input"
+    }
+  },
+  {
+    "name": "salary_plus_domestic_cap_gains",
+    "modules": ["salary_basic", "domestic_cap_gains", "domestic_112a", "domestic_other_sources"],
+    "must_select_contains": ["salary", "cg", "os"],
+    "must_deselect_contains": [],
+    "screen_modes": {
+      "Schedule CG": "manual_input",
+      "Schedule 112A": "manual_input",
+      "Schedule OS": "manual_input"
+    },
+    "upload_packets_contains": ["112a_csv"]
+  },
+  {
+    "name": "salary_plus_foreign_assets_income",
+    "modules": ["salary_basic", "foreign_assets", "foreign_income", "foreign_tax_credit"],
+    "must_select_contains": ["salary", "fa", "fsi", "tr"],
+    "must_deselect_contains": ["Schedule AMTC"],
+    "screen_modes": {
+      "Schedule FA": "manual_input",
+      "Schedule FSI": "manual_input",
+      "Schedule TR": "manual_input"
+    }
+  },
+  {
+    "name": "professional_44ada_no_books_only",
+    "modules": ["professional_44ada_no_books"],
+    "must_select_contains": ["bp"],
+    "must_deselect_contains": [
+      "Part A - Manufacturing Account",
+      "Part A - Trading Account",
+      "Part A - OI",
+      "Schedule UD"
+    ],
+    "screen_modes": {
+      "Part A - Balance Sheet": "mandatory_visible_zero_confirm",
+      "Part A - P & L": "mandatory_visible_zero_confirm",
+      "Part B-TI": "review_only"
+    }
+  },
+  {
+    "name": "target_composite_persona",
+    "modules": [
+      "salary_basic",
+      "professional_44ada_no_books",
+      "domestic_cap_gains",
+      "domestic_112a",
+      "domestic_other_sources",
+      "foreign_assets",
+      "foreign_income",
+      "foreign_tax_credit",
+      "prior_year_loss_setoff",
+      "director_disclosure",
+      "unlisted_equity_disclosure"
+    ],
+    "must_select_contains": ["salary", "bp", "cg", "os", "fa", "fsi", "tr", "bfla"],
+    "must_deselect_contains": [
+      "Part A - Manufacturing Account",
+      "Part A - Trading Account",
+      "Part A - OI",
+      "Schedule UD",
+      "Schedule AL",
+      "Schedule AMTC"
+    ],
+    "screen_modes": {
+      "Schedule Salary": "manual_input",
+      "Schedule BP": "manual_input",
+      "Schedule CG": "manual_input",
+      "Schedule OS": "manual_input",
+      "Schedule FA": "manual_input",
+      "Schedule FSI": "manual_input",
+      "Schedule TR": "manual_input",
+      "Director company disclosures": "manual_input",
+      "Unlisted equity rows": "manual_input",
+      "Part B-TTI": "review_only",
+      "Schedule SI": "auto_derived"
+    },
+    "stale_rules_contains": [
+      "Manufacturing Account",
+      "AMT credit"
+    ],
+    "upload_packets_contains": ["112a_csv"]
+  }
+]

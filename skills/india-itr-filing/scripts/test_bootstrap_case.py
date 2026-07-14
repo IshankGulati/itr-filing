@@ -62,6 +62,7 @@ class BootstrapCaseTests(unittest.TestCase):
             self.assertTrue((case_root / "case_learnings.md").exists())
             self.assertIn("execution_mode: none", profile)
             self.assertIn("portal_fill_status: not_offered", profile)
+            self.assertIn("persona_modules: []", profile)
 
     def test_json_targeted_case_gets_full_scaffold(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -120,12 +121,22 @@ class BootstrapCaseTests(unittest.TestCase):
             self.assertFalse((case_root / "outputs" / "itr-draft.json").exists())
             self.assertTrue((case_root / "outputs" / "filing-readiness.md").exists())
             self.assertTrue((case_root / "outputs" / "portal-field-map.yaml").exists())
+            self.assertTrue((case_root / "outputs" / "schedule_inventory.yaml").exists())
             self.assertTrue((case_root / "outputs" / "portal-entry-plan.md").exists())
+            self.assertTrue((case_root / "outputs" / "review_only_schedules.md").exists())
             self.assertTrue((case_root / "outputs" / "portal-session-log.md").exists())
             self.assertTrue((case_root / "outputs" / "portal-prefill-diff.md").exists())
+            self.assertTrue((case_root / "outputs" / "upload_packets" / "README.md").exists())
+            self.assertTrue((case_root / "outputs" / "upload_packets" / "112a-status.md").exists())
             self.assertIn("execution_mode: portal_draft_fill", profile)
             self.assertIn("preferred_browser: unknown", profile)
+            self.assertIn("persona_modules: []", profile)
             self.assertIn("- login", profile)
+            schedule_inventory = json.loads(
+                (case_root / "outputs" / "schedule_inventory.yaml").read_text(
+                    encoding="utf-8"
+                )
+            )
             self.assertEqual(
                 sorted(portal_packet.keys()),
                 sorted(
@@ -138,6 +149,25 @@ class BootstrapCaseTests(unittest.TestCase):
                         "source_refs",
                         "review_flags",
                     ]
+                ),
+            )
+            self.assertIn("active_persona_modules", portal_packet["metadata"])
+            self.assertIn("selection_audit_complete", portal_packet["metadata"])
+            self.assertIn("upload_packets", portal_packet["metadata"])
+            self.assertIn("screens", schedule_inventory)
+            self.assertIn("metadata", schedule_inventory)
+            self.assertIn(
+                "Part A - Manufacturing Account",
+                schedule_inventory["screens"],
+            )
+            self.assertIn(
+                "Schedule SI",
+                schedule_inventory["screens"],
+            )
+            self.assertIn(
+                "## Part B-TI",
+                (case_root / "outputs" / "review_only_schedules.md").read_text(
+                    encoding="utf-8"
                 ),
             )
 

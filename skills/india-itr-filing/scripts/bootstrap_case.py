@@ -5,8 +5,20 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from datetime import date
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from persona_policy import (
+    SCREEN_MODE_CHOICES,
+    TARGET_COMPOSITE_PERSONA_MODULES,
+    starter_review_only_screens,
+    starter_schedule_inventory,
+)
 
 
 BASE_CASE_DIRS = [
@@ -131,6 +143,7 @@ investment_buckets:
   foreign_broker: false
   vda: false
 schedule_candidates: []
+persona_modules: []
 notes: []
 """
 
@@ -504,6 +517,10 @@ FILING_READINESS_TEMPLATE = """# Filing Readiness
 - Utility available for current AY:
 - Draft JSON attempted:
 - Ready for manual portal or utility entry:
+- Schedule selection audit complete:
+- Visible schedules classified:
+- Stale selections resolved:
+- Upload packet readiness:
 - Portal fill readiness:
 - Remaining blockers:
 """
@@ -516,13 +533,20 @@ Last updated: {today}
 Use this only after `outputs/filing-readiness.md` says the case is ready for manual
 portal or utility entry and the user explicitly opted into live portal drafting.
 
+## Before live entry
+
+1. Run the schedule-selection audit against `outputs/schedule_inventory.yaml`.
+2. Mark stale or over-selected screens for deselection, fast-path review, or zero-confirm handling before editing values.
+3. Use `outputs/review_only_schedules.md` to keep derived screens out of the first-pass manual-entry queue.
+4. Check `outputs/upload_packets/` and `portal-field-map.yaml > metadata > upload_packets` before retyping `112A` rows manually.
+
 ## Default order
 
-1. Prefill inspection
+1. Prefill inspection and schedule-selection cleanup
 2. Part A and profile questions
 3. Branch-driving questions
-4. Income schedules
-5. Taxes and credits
+4. Manual-input income schedules
+5. Review-only or auto-derived tax and set-off checkpoints
 6. Foreign or advanced schedules if present
 7. Bank and refund review
 8. Preview stop point for human review
@@ -555,11 +579,35 @@ PORTAL_PREFILL_DIFF_TEMPLATE = """# Portal Prefill Diff
 Last updated: {today}
 
 Record portal-prepopulated values versus the workpaper source of truth before or during
-live entry. Use action labels `keep`, `update`, or `add`.
+live entry. Use action labels `keep`, `update`, `add`, or `deselect`.
 
 | Section | Portal value | Workpaper value | Action | Source ref | Notes |
 | --- | --- | --- | --- | --- | --- |
 |  |  |  |  |  |  |
+"""
+
+
+UPLOAD_PACKET_README_TEMPLATE = """# Upload Packets
+
+Last updated: {today}
+
+This folder holds portal-import helpers when a stable template exists.
+
+- `112a-status.md` records the current readiness of a future `112A` CSV import path.
+- Do not claim a packet is upload-ready until a real current-AY template has been checked in or supplied for the active case.
+"""
+
+
+UPLOAD_PACKET_112A_TEMPLATE = """# 112A Upload Status
+
+Last updated: {today}
+
+- Packet id: `112a_csv`
+- Status: scaffold_only
+- Template path:
+- Current AY confirmed:
+- Row source:
+- Notes: Actual CSV generation is intentionally deferred until a real portal template is available in the workspace.
 """
 
 
@@ -657,6 +705,30 @@ def input_subdirs(case_tier: str, filing_goal: str, execution_mode: str) -> list
     return subdirs
 
 
+def review_only_schedules_content(today: str) -> str:
+    lines = [
+        "# Review-Only Schedules",
+        "",
+        f"Last updated: {today}",
+        "",
+        "Use this starter list to keep derived or mandatory-visible screens out of the first-pass manual-entry queue.",
+        "",
+    ]
+
+    for row in starter_review_only_screens():
+        lines.append(f"## {row['screen']}")
+        lines.append("")
+        lines.append(f"- Screen mode: `{row['screen_mode']}`")
+        lines.append(f"- Why: {row['why']}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def schedule_inventory_content() -> str:
+    return json.dumps(starter_schedule_inventory([]), indent=2) + "\n"
+
+
 def portal_field_map_content(
     fy: str,
     ay: str,
@@ -682,7 +754,16 @@ def portal_field_map_content(
             "login_state": "unknown",
             "last_completed_portal_section": "",
             "human_only_steps": PORTAL_HUMAN_ONLY_STEPS,
+            "active_persona_modules": [],
+            "selection_audit_complete": False,
             "in_scope_schedules": [],
+            "upload_packets": {
+                "112a_csv": {
+                    "status": "scaffold_only",
+                    "template_path": "",
+                    "notes": "Actual CSV generation requires a checked-in or user-supplied current-AY template.",
+                }
+            },
             "schedule_field_packets": schedule_field_packets,
         },
         "branch_questions": {
@@ -859,14 +940,26 @@ def bootstrap_case(
         )
 
     if wants_portal_scaffold(execution_mode):
+        upload_packets_dir = case_root / "outputs" / "upload_packets"
+        upload_packets_dir.mkdir(parents=True, exist_ok=True)
         write_text(
             case_root / "outputs" / "portal-field-map.yaml",
             portal_field_map_content(fy, ay, execution_mode),
             overwrite,
         )
         write_text(
+            case_root / "outputs" / "schedule_inventory.yaml",
+            schedule_inventory_content(),
+            overwrite,
+        )
+        write_text(
             case_root / "outputs" / "portal-entry-plan.md",
             PORTAL_ENTRY_PLAN_TEMPLATE.format(today=today),
+            overwrite,
+        )
+        write_text(
+            case_root / "outputs" / "review_only_schedules.md",
+            review_only_schedules_content(today),
             overwrite,
         )
         write_text(
@@ -877,6 +970,16 @@ def bootstrap_case(
         write_text(
             case_root / "outputs" / "portal-prefill-diff.md",
             PORTAL_PREFILL_DIFF_TEMPLATE.format(today=today),
+            overwrite,
+        )
+        write_text(
+            upload_packets_dir / "README.md",
+            UPLOAD_PACKET_README_TEMPLATE.format(today=today),
+            overwrite,
+        )
+        write_text(
+            upload_packets_dir / "112a-status.md",
+            UPLOAD_PACKET_112A_TEMPLATE.format(today=today),
             overwrite,
         )
 

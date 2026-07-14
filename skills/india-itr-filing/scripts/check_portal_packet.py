@@ -13,6 +13,20 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     yaml = None
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from persona_policy import (
+    DERIVED_OR_FAST_PATH_SCREEN_NAMES,
+    NO_BOOKS_FAST_PATH_SCREENS,
+    NO_BOOKS_NON_SUBSTANTIVE_SCREENS,
+    REVIEW_HEAVY_SCREEN_MODES,
+    SCREEN_MODE_CHOICES,
+    STALE_SELECTION_SCREEN_NAMES,
+    list_persona_modules,
+)
+
 
 PORTAL_EXECUTION_MODES = {
     "portal_draft_fill",
@@ -113,6 +127,34 @@ CONDITIONAL_TABLE_REQUIREMENTS = {
 
 REQUIRED_READINESS_FILES = {
     "outputs/portal-entry-plan.md": "portal entry plan",
+    "outputs/review_only_schedules.md": "review-only schedule guide",
+    "outputs/upload_packets/README.md": "upload packet guide",
+    "outputs/upload_packets/112a-status.md": "112A upload placeholder",
+}
+
+REQUIRED_PORTAL_METADATA_KEYS = {
+    "active_persona_modules",
+    "selection_audit_complete",
+    "upload_packets",
+    "schedule_field_packets",
+}
+
+REQUIRED_SCHEDULE_INVENTORY_FIELDS = {
+    "selected",
+    "visible",
+    "applicable",
+    "screen_mode",
+    "why_selected",
+    "deselect_if_possible",
+    "evidence",
+}
+
+REQUIRED_READINESS_BULLETS = {
+    "ready_for_entry": "Ready for manual portal or utility entry",
+    "schedule_selection_audit_complete": "Schedule selection audit complete",
+    "visible_schedules_classified": "Visible schedules classified",
+    "stale_selections_resolved": "Stale selections resolved",
+    "upload_packet_readiness": "Upload packet readiness",
 }
 
 
@@ -176,6 +218,31 @@ def read_required_text(path: Path, display_name: str) -> str:
         ) from None
 
 
+def load_structured_mapping(path: Path, display_name: str) -> dict[str, object]:
+    text = read_required_text(path, display_name)
+
+    try:
+        loaded = json.loads(text)
+    except json.JSONDecodeError as json_error:
+        if yaml is None:
+            raise PortalPacketValidationError(
+                f"{display_name} is not valid JSON, and YAML parsing is unavailable in "
+                f"this environment: {json_error.msg}."
+            ) from None
+        try:
+            loaded = yaml.safe_load(text)
+        except yaml.YAMLError as yaml_error:
+            raise PortalPacketValidationError(
+                f"{display_name} is not valid JSON or YAML: {yaml_error}."
+            ) from None
+
+    if not isinstance(loaded, dict):
+        raise PortalPacketValidationError(
+            f"{display_name} must decode to a top-level mapping/object."
+        )
+    return loaded
+
+
 def parse_profile(path: Path) -> dict[str, object]:
     text = read_required_text(path, "profile.yaml")
     return {
@@ -187,6 +254,7 @@ def parse_profile(path: Path) -> dict[str, object]:
         ),
         "likely_itr_form": parse_top_level_scalar(text, "likely_itr_form", ""),
         "schedule_candidates": parse_yaml_list(text, "schedule_candidates"),
+        "persona_modules": parse_yaml_list(text, "persona_modules"),
     }
 
 
@@ -238,16 +306,17 @@ def parse_schedule_statuses(path: Path) -> dict[str, str]:
     return statuses
 
 
-def parse_filing_readiness(path: Path) -> str:
+def parse_filing_readiness(path: Path) -> dict[str, str]:
     text = read_required_text(path, "outputs/filing-readiness.md")
-    match = re.search(
-        r"^- Ready for manual portal or utility entry:\s*(.*)$",
-        text,
-        re.MULTILINE,
-    )
-    if match is None:
-        return ""
-    return normalize_scalar(match.group(1))
+    parsed: dict[str, str] = {}
+    for key, label in REQUIRED_READINESS_BULLETS.items():
+        match = re.search(
+            rf"^- {re.escape(label)}:[^\S\n]*(.*)$",
+            text,
+            re.MULTILINE,
+        )
+        parsed[key] = normalize_scalar(match.group(1)) if match is not None else ""
+    return parsed
 
 
 def is_truthy(value: object) -> bool:
@@ -259,30 +328,11 @@ def is_truthy(value: object) -> bool:
 
 
 def load_portal_field_map(path: Path) -> dict[str, object]:
-    text = read_required_text(path, "outputs/portal-field-map.yaml")
+    return load_structured_mapping(path, "outputs/portal-field-map.yaml")
 
-    try:
-        loaded = json.loads(text)
-    except json.JSONDecodeError as json_error:
-        if yaml is None:
-            raise PortalPacketValidationError(
-                "outputs/portal-field-map.yaml is not valid JSON, and YAML parsing is "
-                f"unavailable in this environment: {json_error.msg}."
-            ) from None
-        try:
-            loaded = yaml.safe_load(text)
-        except yaml.YAMLError as yaml_error:
-            raise PortalPacketValidationError(
-                "outputs/portal-field-map.yaml is not valid JSON or YAML: "
-                f"{yaml_error}."
-            ) from None
 
-    if not isinstance(loaded, dict):
-        raise PortalPacketValidationError(
-            "outputs/portal-field-map.yaml must decode to a top-level mapping/object."
-        )
-
-    return loaded
+def load_schedule_inventory(path: Path) -> dict[str, object]:
+    return load_structured_mapping(path, "outputs/schedule_inventory.yaml")
 
 
 def branch_value(entry: object) -> object:
@@ -293,6 +343,83 @@ def branch_value(entry: object) -> object:
 
 def normalize_status(value: str) -> str:
     return value.strip().lower()
+
+
+def screen_selected_or_visible(screen_config: dict[str, object]) -> bool:
+    return bool(screen_config.get("selected")) or bool(screen_config.get("visible"))
+
+
+def explicit_evidence_present(screen_config: dict[str, object]) -> bool:
+    evidence = screen_config.get("evidence", [])
+    if isinstance(evidence, list):
+        return any(str(item).strip() for item in evidence)
+    return str(evidence).strip() != ""
+
+
+def explicit_justification_present(screen_config: dict[str, object]) -> bool:
+    if explicit_evidence_present(screen_config):
+        return True
+    return normalize_scalar(str(screen_config.get("why_selected", ""))) != ""
+
+
+def schedule_inventory_screens(
+    schedule_inventory: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    screens = schedule_inventory.get("screens", {})
+    if not isinstance(screens, dict):
+        return {}
+
+    normalized: dict[str, dict[str, object]] = {}
+    for name, config in screens.items():
+        if isinstance(name, str) and isinstance(config, dict):
+            normalized[name] = config
+    return normalized
+
+
+def collect_related_inventory_screens(
+    screens: dict[str, dict[str, object]],
+    schedule_id: str,
+) -> list[str]:
+    related: list[str] = []
+    for screen_name, screen_config in screens.items():
+        related_ids = screen_config.get("related_schedule_ids", [])
+        if not isinstance(related_ids, list):
+            continue
+        if schedule_id in [str(item).strip() for item in related_ids]:
+            related.append(screen_name)
+    return related
+
+
+def active_persona_modules(
+    profile: dict[str, object],
+    portal_field_map: dict[str, object],
+    schedule_inventory: dict[str, object],
+) -> list[str]:
+    collected: list[str] = []
+    for raw in [profile.get("persona_modules", [])]:
+        if isinstance(raw, list):
+            collected.extend(str(item).strip() for item in raw if str(item).strip())
+
+    metadata = portal_field_map.get("metadata", {})
+    if isinstance(metadata, dict):
+        raw = metadata.get("active_persona_modules", [])
+        if isinstance(raw, list):
+            collected.extend(str(item).strip() for item in raw if str(item).strip())
+
+    inventory_metadata = schedule_inventory.get("metadata", {})
+    if isinstance(inventory_metadata, dict):
+        raw = inventory_metadata.get("active_persona_modules", [])
+        if isinstance(raw, list):
+            collected.extend(str(item).strip() for item in raw if str(item).strip())
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for module_id in collected:
+        if not module_id or module_id in seen:
+            continue
+        seen.add(module_id)
+        deduped.append(module_id)
+    return deduped
 
 
 def collect_portal_packet_errors(case_root: Path) -> list[str]:
@@ -311,13 +438,29 @@ def collect_portal_packet_errors(case_root: Path) -> list[str]:
                 f"found '{likely_itr_form or 'unknown'}'."
             )
 
-        readiness_value = parse_filing_readiness(
+        readiness = parse_filing_readiness(
             case_root / "outputs" / "filing-readiness.md"
         )
-        if not is_truthy(readiness_value):
+        if not is_truthy(readiness.get("ready_for_entry", "")):
             errors.append(
                 "outputs/filing-readiness.md must explicitly mark the case ready for manual "
                 "portal or utility entry before portal drafting."
+            )
+        if not is_truthy(readiness.get("schedule_selection_audit_complete", "")):
+            errors.append(
+                "outputs/filing-readiness.md must confirm the schedule selection audit is complete."
+            )
+        if not is_truthy(readiness.get("visible_schedules_classified", "")):
+            errors.append(
+                "outputs/filing-readiness.md must confirm visible schedules are classified."
+            )
+        if not is_truthy(readiness.get("stale_selections_resolved", "")):
+            errors.append(
+                "outputs/filing-readiness.md must confirm stale selections are resolved."
+            )
+        if not normalize_scalar(readiness.get("upload_packet_readiness", "")):
+            errors.append(
+                "outputs/filing-readiness.md must record upload packet readiness explicitly."
             )
 
         schedule_statuses = parse_schedule_statuses(case_root / "schedule_map.md")
@@ -329,6 +472,9 @@ def collect_portal_packet_errors(case_root: Path) -> list[str]:
 
         portal_field_map = load_portal_field_map(
             case_root / "outputs" / "portal-field-map.yaml"
+        )
+        schedule_inventory = load_schedule_inventory(
+            case_root / "outputs" / "schedule_inventory.yaml"
         )
         missing_top_level_keys = REQUIRED_TOP_LEVEL_PORTAL_KEYS - set(portal_field_map)
         if missing_top_level_keys:
@@ -348,8 +494,28 @@ def collect_portal_packet_errors(case_root: Path) -> list[str]:
         schedule_field_packets = {}
         if isinstance(metadata, dict):
             schedule_field_packets = metadata.get("schedule_field_packets", {})
+            missing_metadata_keys = REQUIRED_PORTAL_METADATA_KEYS - set(metadata)
+            if missing_metadata_keys:
+                errors.append(
+                    "outputs/portal-field-map.yaml metadata is missing keys: "
+                    + ", ".join(sorted(missing_metadata_keys))
+                )
         if not isinstance(schedule_field_packets, dict):
             schedule_field_packets = {}
+
+        selection_audit_complete = False
+        upload_packets = {}
+        if isinstance(metadata, dict):
+            selection_audit_complete = bool(metadata.get("selection_audit_complete"))
+            upload_packets = metadata.get("upload_packets", {})
+        if not selection_audit_complete:
+            errors.append(
+                "portal-field-map.yaml metadata must mark selection_audit_complete before portal drafting."
+            )
+        if not isinstance(upload_packets, dict) or "112a_csv" not in upload_packets:
+            errors.append(
+                "portal-field-map.yaml metadata must include the scaffolded '112a_csv' upload packet."
+            )
 
         branch_questions = portal_field_map.get("branch_questions", {})
         if not isinstance(branch_questions, dict):
@@ -362,6 +528,41 @@ def collect_portal_packet_errors(case_root: Path) -> list[str]:
         table_rows = portal_field_map.get("table_rows", {})
         if not isinstance(table_rows, dict):
             table_rows = {}
+
+        screens = schedule_inventory_screens(schedule_inventory)
+        if not screens:
+            errors.append(
+                "outputs/schedule_inventory.yaml must contain a non-empty 'screens' mapping."
+            )
+        for screen_name, screen_config in screens.items():
+            missing_screen_fields = REQUIRED_SCHEDULE_INVENTORY_FIELDS - set(screen_config)
+            if missing_screen_fields:
+                errors.append(
+                    f"Screen '{screen_name}' in outputs/schedule_inventory.yaml is missing fields: "
+                    + ", ".join(sorted(missing_screen_fields))
+                )
+                continue
+
+            screen_mode = normalize_status(str(screen_config.get("screen_mode", "")))
+            if screen_mode not in SCREEN_MODE_CHOICES:
+                errors.append(
+                    f"Screen '{screen_name}' uses unknown screen_mode '{screen_mode or 'unknown'}'."
+                )
+
+            if screen_selected_or_visible(screen_config) and not screen_mode:
+                errors.append(
+                    f"Screen '{screen_name}' is selected or visible but has no screen_mode."
+                )
+
+            if (
+                bool(screen_config.get("selected"))
+                and not bool(screen_config.get("applicable"))
+                and not bool(screen_config.get("deselect_if_possible"))
+                and not explicit_justification_present(screen_config)
+            ):
+                errors.append(
+                    f"Screen '{screen_name}' is selected but inapplicable and is neither marked for deselection nor justified."
+                )
 
         for question_id in REQUIRED_BRANCH_QUESTIONS:
             if question_id not in branch_questions:
@@ -390,6 +591,12 @@ def collect_portal_packet_errors(case_root: Path) -> list[str]:
                     f"Schedule '{schedule_id}' must be marked filing_ready or portal_ready in schedule_map.md."
                 )
 
+            related_screens = collect_related_inventory_screens(screens, schedule_id)
+            if not related_screens:
+                errors.append(
+                    f"outputs/schedule_inventory.yaml must include at least one related screen for schedule '{schedule_id}'."
+                )
+
             packet = schedule_field_packets.get(schedule_id, {})
             packet_ready = isinstance(packet, dict) and normalize_status(
                 str(packet.get("status", ""))
@@ -411,6 +618,75 @@ def collect_portal_packet_errors(case_root: Path) -> list[str]:
                     errors.append(
                         "outputs/portal-field-map.yaml is missing a ready schedule field packet "
                         f"or row set for '{schedule_id}'."
+                    )
+
+        persona_modules = active_persona_modules(profile, portal_field_map, schedule_inventory)
+        known_persona_modules = set(list_persona_modules())
+        for module_id in persona_modules:
+            if module_id not in known_persona_modules:
+                errors.append(f"Unknown persona module '{module_id}' in portal packet metadata.")
+
+        if "professional_44ada_no_books" in persona_modules:
+            for screen_name in NO_BOOKS_NON_SUBSTANTIVE_SCREENS:
+                screen_config = screens.get(screen_name)
+                if screen_config is None or not screen_selected_or_visible(screen_config):
+                    continue
+                screen_mode = normalize_status(str(screen_config.get("screen_mode", "")))
+                if screen_mode == "manual_input" or bool(screen_config.get("applicable")):
+                    errors.append(
+                        f"{screen_name} cannot be treated as substantive portal work for professional_44ada_no_books."
+                    )
+
+            for screen_name in NO_BOOKS_FAST_PATH_SCREENS:
+                screen_config = screens.get(screen_name)
+                if screen_config is None or not screen_selected_or_visible(screen_config):
+                    continue
+                screen_mode = normalize_status(str(screen_config.get("screen_mode", "")))
+                if screen_mode not in REVIEW_HEAVY_SCREEN_MODES:
+                    errors.append(
+                        f"{screen_name} must be classified as a fast-path or review-heavy screen for professional_44ada_no_books."
+                    )
+
+            for screen_name in DERIVED_OR_FAST_PATH_SCREEN_NAMES:
+                screen_config = screens.get(screen_name)
+                if screen_config is None or not screen_selected_or_visible(screen_config):
+                    continue
+                screen_mode = normalize_status(str(screen_config.get("screen_mode", "")))
+                if screen_mode not in REVIEW_HEAVY_SCREEN_MODES:
+                    errors.append(
+                        f"{screen_name} must be review-heavy, auto-derived, or zero-confirm for professional_44ada_no_books."
+                    )
+
+            audit_applicable = branch_value(branch_questions.get("audit_applicable"))
+            oi_screen = screens.get("Part A - OI")
+            if oi_screen is not None and bool(oi_screen.get("selected")):
+                if (
+                    not bool(oi_screen.get("deselect_if_possible"))
+                    and audit_applicable is not True
+                    and not explicit_evidence_present(oi_screen)
+                ):
+                    errors.append(
+                        "Part A - OI cannot stay selected by default for professional_44ada_no_books without audit or regular-books evidence."
+                    )
+
+            for screen_name in STALE_SELECTION_SCREEN_NAMES:
+                screen_config = screens.get(screen_name)
+                if screen_config is None or not screen_selected_or_visible(screen_config):
+                    continue
+                if bool(screen_config.get("applicable")) and not explicit_evidence_present(
+                    screen_config
+                ):
+                    errors.append(
+                        f"{screen_name} is present without explicit applicability evidence."
+                    )
+                if (
+                    not bool(screen_config.get("applicable"))
+                    and not bool(screen_config.get("deselect_if_possible"))
+                    and normalize_status(str(screen_config.get("screen_mode", "")))
+                    not in REVIEW_HEAVY_SCREEN_MODES.union({"not_applicable_visible"})
+                ):
+                    errors.append(
+                        f"{screen_name} must be marked for deselection or given an explicit fast-path classification."
                     )
 
         for branch_key, table_key in CONDITIONAL_TABLE_REQUIREMENTS.items():

@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from persona_policy import starter_schedule_inventory
 
 
 SCRIPT_PATH = Path(__file__).with_name("check_portal_packet.py")
@@ -97,6 +104,15 @@ def build_schedule_map(schedule_statuses: dict[str, str]) -> str:
 def build_portal_packet() -> dict[str, object]:
     return {
         "metadata": {
+            "active_persona_modules": [],
+            "selection_audit_complete": True,
+            "upload_packets": {
+                "112a_csv": {
+                    "status": "scaffold_only",
+                    "template_path": "",
+                    "notes": "fixture",
+                }
+            },
             "schedule_field_packets": {
                 "salary": {"status": "ready", "summary": "", "source_refs": []},
                 "cg": {"status": "ready", "summary": "", "source_refs": []},
@@ -137,6 +153,15 @@ def build_portal_packet() -> dict[str, object]:
     }
 
 
+def build_schedule_inventory() -> dict[str, object]:
+    inventory = starter_schedule_inventory([])
+    screens = inventory["screens"]
+    assert isinstance(screens, dict)
+    screens["Schedule Salary"]["related_schedule_ids"] = ["salary"]
+    screens["Schedule CG"]["related_schedule_ids"] = ["cg"]
+    return inventory
+
+
 def write_case_fixture(
     case_root: Path,
     *,
@@ -144,17 +169,37 @@ def write_case_fixture(
     portal_fill_status: str = "accepted",
     likely_itr_form: str = "ITR-2",
     schedule_candidates: list[str] | None = None,
+    persona_modules: list[str] | None = None,
     schedule_statuses: dict[str, str] | None = None,
     ready_for_entry: str = "yes",
+    selection_audit_complete: str = "yes",
+    visible_schedules_classified: str = "yes",
+    stale_selections_resolved: str = "yes",
+    upload_packet_readiness: str = "scaffold_only",
     portal_packet: dict[str, object] | None = None,
+    schedule_inventory: dict[str, object] | None = None,
     include_prefill_diff: bool = True,
     include_entry_plan: bool = True,
     include_session_log: bool = True,
+    include_schedule_inventory: bool = True,
+    include_review_only: bool = True,
+    include_upload_packet_docs: bool = True,
     portal_packet_text: str | None = None,
 ) -> None:
     schedule_candidates = schedule_candidates or ["salary"]
+    persona_modules = persona_modules or []
     schedule_statuses = schedule_statuses or {"salary": "portal_ready"}
     portal_packet = portal_packet or build_portal_packet()
+    schedule_inventory = schedule_inventory or build_schedule_inventory()
+    portal_packet_metadata = portal_packet.get("metadata", {})
+    if isinstance(portal_packet_metadata, dict):
+        portal_packet_metadata["active_persona_modules"] = list(persona_modules)
+        portal_packet_metadata["selection_audit_complete"] = (
+            selection_audit_complete.lower() == "yes"
+        )
+    inventory_metadata = schedule_inventory.get("metadata", {})
+    if isinstance(inventory_metadata, dict):
+        inventory_metadata["active_persona_modules"] = list(persona_modules)
 
     (case_root / "outputs").mkdir(parents=True, exist_ok=True)
 
@@ -171,6 +216,8 @@ def write_case_fixture(
         "schedule_candidates:",
     ]
     profile_lines.extend(f"  - {item}" for item in schedule_candidates)
+    profile_lines.append("persona_modules:")
+    profile_lines.extend(f"  - {item}" for item in persona_modules)
     (case_root / "profile.yaml").write_text(
         "\n".join(profile_lines) + "\n",
         encoding="utf-8",
@@ -182,7 +229,11 @@ def write_case_fixture(
     )
     (case_root / "outputs" / "filing-readiness.md").write_text(
         "# Filing Readiness\n\n"
-        f"- Ready for manual portal or utility entry: {ready_for_entry}\n",
+        f"- Ready for manual portal or utility entry: {ready_for_entry}\n"
+        f"- Schedule selection audit complete: {selection_audit_complete}\n"
+        f"- Visible schedules classified: {visible_schedules_classified}\n"
+        f"- Stale selections resolved: {stale_selections_resolved}\n"
+        f"- Upload packet readiness: {upload_packet_readiness}\n",
         encoding="utf-8",
     )
     if portal_packet_text is None:
@@ -191,9 +242,19 @@ def write_case_fixture(
         portal_packet_text,
         encoding="utf-8",
     )
+    if include_schedule_inventory:
+        (case_root / "outputs" / "schedule_inventory.yaml").write_text(
+            json.dumps(schedule_inventory, indent=2) + "\n",
+            encoding="utf-8",
+        )
     if include_entry_plan:
         (case_root / "outputs" / "portal-entry-plan.md").write_text(
             "# Portal Entry Plan\n",
+            encoding="utf-8",
+        )
+    if include_review_only:
+        (case_root / "outputs" / "review_only_schedules.md").write_text(
+            "# Review-Only Schedules\n",
             encoding="utf-8",
         )
     if include_session_log:
@@ -204,6 +265,16 @@ def write_case_fixture(
     if include_prefill_diff:
         (case_root / "outputs" / "portal-prefill-diff.md").write_text(
             "# Portal Prefill Diff\n",
+            encoding="utf-8",
+        )
+    if include_upload_packet_docs:
+        (case_root / "outputs" / "upload_packets").mkdir(parents=True, exist_ok=True)
+        (case_root / "outputs" / "upload_packets" / "README.md").write_text(
+            "# Upload Packets\n",
+            encoding="utf-8",
+        )
+        (case_root / "outputs" / "upload_packets" / "112a-status.md").write_text(
+            "# 112A Upload Status\n",
             encoding="utf-8",
         )
 
@@ -234,6 +305,13 @@ class CheckPortalPacketTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             case_root = Path(tmpdir)
             yaml_portal_packet = """metadata:
+  active_persona_modules: []
+  selection_audit_complete: true
+  upload_packets:
+    112a_csv:
+      status: scaffold_only
+      template_path: ''
+      notes: fixture
   schedule_field_packets:
     salary:
       status: ready
@@ -271,7 +349,9 @@ bank_details:
 table_rows:
   director_companies: []
   unlisted_equity_rows: []
-  capital_gain_rows: []
+  capital_gain_rows:
+    - asset: MF
+      amount: 1
   foreign_asset_rows: []
 source_refs: []
 review_flags: []
@@ -349,6 +429,132 @@ review_flags: []
 
             self.assertTrue(
                 any("outputs/portal-entry-plan.md is required" in error for error in errors),
+                errors,
+            )
+
+    def test_blank_upload_packet_readiness_stays_blank_and_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            write_case_fixture(case_root, upload_packet_readiness="")
+
+            readiness = check_portal_packet_module.parse_filing_readiness(
+                case_root / "outputs" / "filing-readiness.md"
+            )
+            self.assertEqual(readiness["upload_packet_readiness"], "")
+
+            errors = check_portal_packet_module.collect_portal_packet_errors(case_root)
+
+            self.assertTrue(
+                any("must record upload packet readiness explicitly" in error for error in errors),
+                errors,
+            )
+
+    def test_missing_schedule_inventory_fails_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            write_case_fixture(case_root, include_schedule_inventory=False)
+
+            errors = check_portal_packet_module.collect_portal_packet_errors(case_root)
+
+            self.assertEqual(
+                errors,
+                [
+                    "outputs/schedule_inventory.yaml is required when execution_mode includes portal draft filling."
+                ],
+            )
+
+    def test_selected_screen_without_screen_mode_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            schedule_inventory = build_schedule_inventory()
+            schedule_inventory["screens"]["Schedule Salary"]["screen_mode"] = ""
+            write_case_fixture(case_root, schedule_inventory=schedule_inventory)
+
+            errors = check_portal_packet_module.collect_portal_packet_errors(case_root)
+
+            self.assertTrue(
+                any("Screen 'Schedule Salary' uses unknown screen_mode" in error for error in errors),
+                errors,
+            )
+
+    def test_stale_schedule_without_deselect_or_evidence_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            schedule_inventory = build_schedule_inventory()
+            schedule_inventory["screens"]["Schedule AL"] = {
+                "selected": True,
+                "visible": True,
+                "applicable": True,
+                "screen_mode": "manual_input",
+                "why_selected": "Portal shows it.",
+                "deselect_if_possible": False,
+                "evidence": [],
+                "related_schedule_ids": ["al"],
+            }
+            write_case_fixture(
+                case_root,
+                persona_modules=["professional_44ada_no_books"],
+                schedule_inventory=schedule_inventory,
+            )
+
+            errors = check_portal_packet_module.collect_portal_packet_errors(case_root)
+
+            self.assertTrue(
+                any("Schedule AL is present without explicit applicability evidence." in error for error in errors),
+                errors,
+            )
+
+    def test_44ada_no_books_cannot_treat_manufacturing_or_oi_as_substantive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            schedule_inventory = build_schedule_inventory()
+            schedule_inventory["screens"]["Part A - Manufacturing Account"]["applicable"] = True
+            schedule_inventory["screens"]["Part A - Manufacturing Account"]["screen_mode"] = "manual_input"
+            schedule_inventory["screens"]["Part A - OI"]["deselect_if_possible"] = False
+            schedule_inventory["screens"]["Part A - OI"]["screen_mode"] = "manual_input"
+            write_case_fixture(
+                case_root,
+                schedule_candidates=["bp"],
+                schedule_statuses={"bp": "portal_ready"},
+                persona_modules=["professional_44ada_no_books"],
+                portal_packet=build_portal_packet(),
+                schedule_inventory=schedule_inventory,
+            )
+
+            errors = check_portal_packet_module.collect_portal_packet_errors(case_root)
+
+            self.assertTrue(
+                any("Manufacturing Account cannot be treated as substantive" in error for error in errors),
+                errors,
+            )
+            self.assertTrue(
+                any("Part A - OI cannot stay selected by default" in error for error in errors),
+                errors,
+            )
+
+    def test_review_heavy_screens_left_manual_fail_for_44ada(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            case_root = Path(tmpdir)
+            schedule_inventory = build_schedule_inventory()
+            schedule_inventory["screens"]["Part B-TI"]["screen_mode"] = "manual_input"
+            schedule_inventory["screens"]["Schedule BFLA"]["screen_mode"] = "manual_input"
+            write_case_fixture(
+                case_root,
+                schedule_candidates=["bp", "bfla"],
+                schedule_statuses={"bp": "portal_ready", "bfla": "portal_ready"},
+                persona_modules=["professional_44ada_no_books"],
+                schedule_inventory=schedule_inventory,
+                portal_packet=build_portal_packet(),
+            )
+
+            errors = check_portal_packet_module.collect_portal_packet_errors(case_root)
+
+            self.assertTrue(
+                any("Part B-TI must be review-heavy" in error for error in errors),
+                errors,
+            )
+            self.assertTrue(
+                any("Schedule BFLA must be review-heavy" in error for error in errors),
                 errors,
             )
 

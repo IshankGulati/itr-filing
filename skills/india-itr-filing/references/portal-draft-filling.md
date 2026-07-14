@@ -25,11 +25,20 @@ Do not jump into browser work while major classification or reconciliation block
 Before any live portal work:
 
 - `outputs/filing-readiness.md` must explicitly say the case is ready for manual portal or utility entry
-- `profile.yaml` must capture `execution_mode`, `portal_fill_status`, `preferred_browser`, `login_state`, `human_only_steps`, and `last_completed_portal_section`
+- `outputs/filing-readiness.md` must also record:
+  - schedule selection audit complete
+  - visible schedules classified
+  - stale selections resolved
+  - upload packet readiness
+- `profile.yaml` must capture `execution_mode`, `portal_fill_status`, `preferred_browser`, `login_state`, `human_only_steps`, `last_completed_portal_section`, and `persona_modules`
 - `outputs/portal-field-map.yaml` must exist and answer the branch-driving questions explicitly; the checker accepts either JSON-compatible or normal YAML syntax in that file
+- `outputs/portal-field-map.yaml > metadata` must also record `active_persona_modules`, `selection_audit_complete`, and `upload_packets`
+- `outputs/schedule_inventory.yaml` must exist and classify every selected or visible screen with `selected`, `visible`, `applicable`, `screen_mode`, `why_selected`, `deselect_if_possible`, and `evidence`
 - `schedule_map.md` must mark in-scope schedules as `filing_ready` or `portal_ready`
-- `outputs/portal-entry-plan.md` must describe the order of entry
+- `outputs/review_only_schedules.md` must exist so derived screens do not become first-pass manual-entry targets
+- `outputs/portal-entry-plan.md` must describe the order of entry after the schedule-selection audit
 - `outputs/portal-session-log.md` must exist before the live session starts and must be kept current once work is in progress
+- `outputs/upload_packets/` must exist when the scaffold promises an upload path, even if the packet is still `scaffold_only`
 
 If any of the above is missing, stop and finish the packet instead of improvising through the browser.
 
@@ -37,11 +46,20 @@ If any of the above is missing, stop and finish the packet instead of improvisin
 
 Inspect the portal's prefilled state before editing anything substantial.
 
+First do a selection audit:
+
+- compare the portal chooser against the active persona modules
+- identify screens that are selected but not actually applicable
+- deselect what the portal allows
+- classify anything still visible as `manual_input`, `review_only`, `auto_derived`, `mandatory_visible_zero_confirm`, `not_applicable_visible`, or `blocked`
+
+This matters most in `ITR-3` no-books cases where the portal can still surface business-heavy screens that do not deserve regular-books treatment.
+
 Record the comparison in `outputs/portal-prefill-diff.md`:
 
 - what the portal already shows
 - what the workpaper pack says
-- whether the action is `keep`, `update`, or `add`
+- whether the action is `keep`, `update`, `add`, or `deselect`
 - which source document or workpaper supports the decision
 
 Treat portal prefill as a starting point, not as authoritative truth.
@@ -79,6 +97,17 @@ Common branch drivers include:
 - unlisted shares
 
 If a section disappears after one of these answers changes, do not assume the portal is broken. First check whether the branch effect is consistent with the packet.
+
+For `professional_44ada_no_books` cases, do not let `ITR-3` business routing trick you into treating:
+
+- Manufacturing Account
+- Trading Account
+- `OI`
+- `UD`
+- `AL`
+- `AMTC`
+
+as substantive manual work unless the case actually proves they belong.
 
 ## 6. Human-only boundaries
 

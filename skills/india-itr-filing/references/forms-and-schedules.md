@@ -57,6 +57,19 @@ Do not mix these up while profiling the case.
   - `AMT`
   - `AMTC`
 
+Also keep portal screen state separate from schedule scope:
+
+- `selected`
+  - chosen in the portal or carried forward by stale draft state
+- `visible`
+  - still shown after portal routing
+- `applicable`
+  - legally or practically in scope for the case
+- `manual`
+  - still needs substantive human or agent entry
+
+Do not overload `schedule_candidates` with portal-only screens like Manufacturing Account, Trading Account, `OI`, `Part B-TI`, or `Part B-TTI`. Keep those in `outputs/schedule_inventory.yaml` instead.
+
 ## 2. Common supporting documents
 
 ### Salary or pension
@@ -196,4 +209,6 @@ Keep `SI` separate from `SPI`: `SI` is the special-rate income schedule, while `
 
 If a case is only a tax estimate, the schedule list can stay provisional. If the case is targeting a utility draft or portal-entry pack, the schedule list must become explicit before the final handoff.
 If the case is targeting a portal-entry pack, schedule-level prose is not enough. The handoff should also include explicit field-level answers for branch-driving questions and row-ready data for portal tables such as unlisted shares, capital gains, director-company disclosures, and foreign assets when those sections are in scope.
+If the case is targeting a portal-entry pack, also classify visible screens in `outputs/schedule_inventory.yaml` with `manual_input`, `review_only`, `auto_derived`, `mandatory_visible_zero_confirm`, `not_applicable_visible`, or `blocked`.
+Derived or review-heavy screens such as `SI`, `CYLA`, `BFLA`, `Part B-TI`, `Part B-TTI`, and some tax-paid views should not automatically become first-pass manual-entry targets just because the portal shows them.
 Do not collapse `VDA` into normal capital gains or other sources. Treat it as a dedicated special-rate area and confirm current-law restrictions on deductions, set-off, and carry-forward before computing it.

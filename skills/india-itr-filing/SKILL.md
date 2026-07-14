@@ -37,11 +37,14 @@ Foreign scope in this skill is limited to Indian taxpayers who hold foreign inve
 2. Read [references/return-form-taxonomy.md](references/return-form-taxonomy.md).
 3. Read [references/intake-checklist.md](references/intake-checklist.md).
 4. Read [references/case-buckets.md](references/case-buckets.md) if you need a first-pass archetype for the user.
-5. Read [references/forms-and-schedules.md](references/forms-and-schedules.md) before mapping work into a filing-ready JSON or portal packet.
-6. Read [references/portal-draft-filling.md](references/portal-draft-filling.md) before starting any live browser-based portal drafting.
-7. Read [references/broker-playbooks.md](references/broker-playbooks.md) when broker or platform-specific exports matter.
-8. If a local workspace would help, run `scripts/bootstrap_case.py <case-root> --fy FY_2025-26 --ay "AY 2026-27" --tier simple` for a lean starter or switch `--tier`, `--filing-goal`, or `--execution-mode` when the case is more complex, JSON-targeted, or portal-draft-targeted.
-9. If the user already has files scattered across different folders, do not force a folder migration. Keep a manifest with absolute paths instead.
+5. Read [references/persona-modules.md](references/persona-modules.md) when the case is heading toward portal work or `ITR-3` complexity.
+6. Read [references/forms-and-schedules.md](references/forms-and-schedules.md) before mapping work into a filing-ready JSON or portal packet.
+7. Read [references/portal-schedule-selection.md](references/portal-schedule-selection.md) before classifying portal screens.
+8. Read [references/portal-draft-filling.md](references/portal-draft-filling.md) before starting any live browser-based portal drafting.
+9. Read [references/itr3-44ada-no-books-playbook.md](references/itr3-44ada-no-books-playbook.md) when `ITR-3` is being driven by salary plus presumptive professional or disclosure complexity instead of regular books.
+10. Read [references/broker-playbooks.md](references/broker-playbooks.md) when broker or platform-specific exports matter.
+11. If a local workspace would help, run `scripts/bootstrap_case.py <case-root> --fy FY_2025-26 --ay "AY 2026-27" --tier simple` for a lean starter or switch `--tier`, `--filing-goal`, or `--execution-mode` when the case is more complex, JSON-targeted, or portal-draft-targeted.
+12. If the user already has files scattered across different folders, do not force a folder migration. Keep a manifest with absolute paths instead.
 
 ## Workflow
 
@@ -163,11 +166,46 @@ Capture at least:
   - `pti`
   - `amt`
   - `amtc`
+- `persona_modules`
+  - keep this as the composed module list for the actual case
+  - examples:
+    - `salary_basic`
+    - `professional_44ada_no_books`
+    - `domestic_cap_gains`
+    - `foreign_assets`
+    - `foreign_income`
+    - `foreign_tax_credit`
+    - `director_disclosure`
+    - `unlisted_equity_disclosure`
 
 Do not ask for broker exports, foreign schedules, or audit reports unless the profile says they matter.
 Keep `si` separate from `spi`: `si` tracks special-rate income, while `spi` remains the clubbing or specified-person schedule.
 If the user is unsure whether they need to file at all, verify current mandatory-filing triggers from official sources before collecting a large document pack.
 Keep `filing_goal` semantically separate from `execution_mode`: the first describes the deliverable, while the second describes whether utility JSON and/or portal drafting help should be prepared after the calculations are ready.
+Keep `schedule_candidates` high-level. Do not add portal-only screens like Manufacturing Account, Trading Account, `OI`, `Part B-TI`, or `Part B-TTI` to that enum.
+
+## 1A. Compose persona modules before portal work
+
+Before portal drafting, translate the profile into a composed persona-module set.
+
+Working rule:
+
+- use [references/persona-modules.md](references/persona-modules.md) to decide which modules are active
+- record them in `profile.yaml > persona_modules`
+- keep `schedule_map.md` at schedule level
+- move screen-level truth into `outputs/schedule_inventory.yaml`
+- use [references/portal-schedule-selection.md](references/portal-schedule-selection.md) for the distinction between:
+  - `selected`
+  - `visible`
+  - `applicable`
+  - `manual`
+
+Portal readiness is not complete until the case has:
+
+- a schedule-selection audit
+- a classified screen inventory
+- stale-selection cleanup notes
+- a route order that distinguishes manual-input screens from review-only or derived screens
 
 ## 2. Choose the likely ITR form
 
@@ -307,9 +345,12 @@ Conditional JSON set, only when the current AY utility, schema, and validations 
 Conditional portal-draft set, only when `execution_mode` includes `portal_draft_fill`:
 
 - `outputs/portal-field-map.yaml`
+- `outputs/schedule_inventory.yaml`
 - `outputs/portal-entry-plan.md`
+- `outputs/review_only_schedules.md`
 - `outputs/portal-session-log.md`
 - `outputs/portal-prefill-diff.md`
+- `outputs/upload_packets/`
 
 Use the official downloads page, offline-utility manual, and current AY schema from [references/official-links.md](references/official-links.md) whenever the form family is `ITR-1/2/3/4`.
 
@@ -335,7 +376,10 @@ Working rule:
 - only offer portal drafting after `outputs/filing-readiness.md` says the case is ready for manual portal or utility entry
 - require an explicit user opt-in before starting the live browser phase
 - support live portal drafting only for `ITR-1` through `ITR-4` in v1
-- treat `outputs/portal-field-map.yaml` as the machine-readable source of truth for branch-driving answers, ready field packets, and row-ready tables
+- treat `outputs/portal-field-map.yaml` as the machine-readable source of truth for branch-driving answers, ready field packets, row-ready tables, and upload-packet status
+- treat `outputs/schedule_inventory.yaml` as the screen-level source of truth for `selected`, `visible`, `applicable`, `screen_mode`, `why_selected`, `deselect_if_possible`, and `evidence`
+- require a schedule-selection audit before live entry so stale or over-selected screens are classified before any values are typed
+- use `outputs/review_only_schedules.md` to keep derived schedules out of the first-pass manual-entry queue
 - inspect the portal's prefilled state first, record differences in `outputs/portal-prefill-diff.md`, then edit only mismatches
 - keep `outputs/portal-session-log.md` current so the run can resume after interruption
 - stop at preview or final review and hand back login, OTP or `2FA`, submit, `e-Verify`, and tax payment to the human
@@ -378,15 +422,19 @@ When portal drafting is in scope, `inputs/portal_anchors/` should hold portal-on
 - Read [references/return-form-taxonomy.md](references/return-form-taxonomy.md) for form selection and support boundaries.
 - Read [references/intake-checklist.md](references/intake-checklist.md) for profiling questions and manifest-driven intake.
 - Read [references/case-buckets.md](references/case-buckets.md) for first-pass user archetypes.
+- Read [references/persona-modules.md](references/persona-modules.md) for module composition and the target composite persona.
 - Read [references/document-acquisition.md](references/document-acquisition.md) for common document download paths by income head.
 - Read [references/forms-and-schedules.md](references/forms-and-schedules.md) for common statutory forms, source documents, and likely schedules.
+- Read [references/portal-schedule-selection.md](references/portal-schedule-selection.md) for screen-mode policy, stale-selection handling, and `schedule_inventory.yaml`.
 - Read [references/portal-draft-filling.md](references/portal-draft-filling.md) for portal offer language, readiness gates, pause or resume rules, and human-only boundaries.
+- Read [references/itr3-44ada-no-books-playbook.md](references/itr3-44ada-no-books-playbook.md) for the fast path when `ITR-3` is driven by `44ADA` no-books plus disclosure complexity.
 - Read [references/broker-playbooks.md](references/broker-playbooks.md) for broker and platform export patterns and extension guidance.
 - Read [references/reconciliation-playbook.md](references/reconciliation-playbook.md) for ordering, anti-patterns, and definition of done.
 - Read [references/foreign-income-capital-gains.md](references/foreign-income-capital-gains.md) for lot reconstruction, FX, FTC, and prior-year loss handling.
 
 ## Scripts
 
-- Run `scripts/bootstrap_case.py` to create a neutral case workspace with profile, manifest, workpaper, and request templates. Use `--tier simple|moderate|complex`, `--filing-goal return_workpaper_pack|json_draft_if_feasible|tax_estimate_only|document_collection_first`, and `--execution-mode none|utility_json|portal_draft_fill|utility_json_and_portal_draft_fill` so the scaffold matches the intended delivery and post-calculation execution path.
-- Run `scripts/check_portal_packet.py` before live portal drafting. It exits immediately when `execution_mode` excludes portal filling, and otherwise checks that the filing pack, schedule statuses, and portal packet are ready for a real browser session.
+- Run `scripts/bootstrap_case.py` to create a neutral case workspace with profile, manifest, workpaper, request templates, `schedule_inventory.yaml`, `review_only_schedules.md`, and upload-packet placeholders. Use `--tier simple|moderate|complex`, `--filing-goal return_workpaper_pack|json_draft_if_feasible|tax_estimate_only|document_collection_first`, and `--execution-mode none|utility_json|portal_draft_fill|utility_json_and_portal_draft_fill` so the scaffold matches the intended delivery and post-calculation execution path.
+- Use `scripts/persona_policy.py` as the shared machine-readable source for persona modules, starter portal screens, stale-selection rules, and upload-packet scaffolding.
+- Run `scripts/check_portal_packet.py` before live portal drafting. It exits immediately when `execution_mode` excludes portal filling, and otherwise checks that the filing pack, schedule statuses, `schedule_inventory.yaml`, and portal packet are ready for a real browser session.
 - Run `scripts/check_schedule_consistency.py` after editing the `schedule_candidates` enum in this file or [references/forms-and-schedules.md](references/forms-and-schedules.md). It fails loudly if the two drift out of sync instead of leaving a stale or undocumented id in place.
